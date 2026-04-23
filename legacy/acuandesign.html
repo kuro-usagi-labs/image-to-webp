@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Image Converter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            500: '#0f766e',
+                            600: '#0d9488',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Minimalist scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #e4e4e7;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d4d4d8;
+        }
+
+        /* Hide number input spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Custom Sleek Tooltip */
+        [data-tooltip] {
+            position: relative;
+        }
+
+        [data-tooltip]::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translate(-50%, -4px) scale(0.95);
+            background-color: #18181b;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 100;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        [data-tooltip]:hover::before {
+            opacity: 1;
+            transform: translate(-50%, -8px) scale(1);
+        }
+
+        /* Tooltip Arah Bawah (Untuk Grid View) */
+        [data-tooltip-bottom] {
+            position: relative;
+        }
+
+        [data-tooltip-bottom]::before {
+            content: attr(data-tooltip-bottom);
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translate(-50%, 4px) scale(0.95);
+            background-color: #18181b;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 100;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        [data-tooltip-bottom]:hover::before {
+            opacity: 1;
+            transform: translate(-50%, 8px) scale(1);
+        }
+
+        /* Base class Item Card */
+        .item-card {
+            will-change: transform, opacity;
+            transform-origin: center center;
+        }
+
+        /* Fluid Toast Notification */
+        .toast-enter {
+            animation: toastSpringIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .toast-exit {
+            animation: toastSlideOut 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes toastSpringIn {
+            0% {
+                transform: translateY(-150%) scale(0.85);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes toastSlideOut {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-150%) scale(0.85);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-zinc-50 min-h-screen flex items-center justify-center p-4 md:p-8 text-zinc-800 antialiased selection:bg-zinc-200 overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div class="fixed top-8 left-1/2 -translate-x-1/2 z-[150] pointer-events-none flex justify-center w-full max-w-sm">
+        <div id="apple-toast"
+            class="flex items-center gap-2.5 px-4 py-2.5 bg-zinc-900/80 backdrop-blur-xl border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded-full text-white/95 text-sm font-medium opacity-0 transform -translate-y-[150%] scale-85">
+            <i id="toast-icon" class="ph-fill ph-check-circle text-brand-400 text-lg"></i>
+            <span id="toast-message">Action triggered</span>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div
+        class="w-full max-w-[1100px] h-[85vh] min-h-[700px] bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex overflow-hidden border border-zinc-200/80 relative">
+
+        <!-- ========================================== -->
+        <!-- LEFT PANEL: FILE LIST & GALLERY VIEWER     -->
+        <!-- ========================================== -->
+        <div class="flex-1 flex flex-col relative z-10 bg-white">
+            <div class="px-8 py-6 border-b border-zinc-100 flex items-center justify-between bg-white z-20">
+                <div>
+                    <h2 class="text-lg font-semibold text-zinc-900 tracking-tight">Queue</h2>
+                    <p class="text-sm text-zinc-500 mt-0.5"><span id="file-count"
+                            class="font-medium text-zinc-700">6</span> files ready</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="simulateAddFile()"
+                        class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 hover:text-brand-600 rounded-lg transition-colors shadow-sm active:scale-95">
+                        <i class="ph ph-plus font-bold"></i> Add Files
+                    </button>
+
+                    <div class="w-px h-6 bg-zinc-200 mx-1"></div>
+
+                    <div class="flex gap-1">
+                        <button id="btn-list" onclick="setView('list')"
+                            class="p-2 text-zinc-900 bg-zinc-100 rounded-md transition-colors flex items-center justify-center"
+                            data-tooltip="List View">
+                            <i class="ph ph-list-dashes text-lg"></i>
+                        </button>
+                        <button id="btn-grid" onclick="setView('grid')"
+                            class="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-md transition-colors flex items-center justify-center"
+                            data-tooltip="Grid View">
+                            <i class="ph ph-squares-four text-lg"></i>
+                        </button>
+                    </div>
+
+                    <button onclick="clearAll()"
+                        class="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors ml-1 flex items-center justify-center"
+                        data-tooltip="Clear All">
+                        <i class="ph ph-trash text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-8 bg-white relative">
+                <!-- Container File (Dikontrol layoutnya oleh JS) -->
+                <div id="file-container" class="flex flex-col gap-1"></div>
+            </div>
+
+            <div
+                class="px-8 py-4 border-t border-zinc-100 bg-white/50 text-xs text-zinc-500 flex justify-between items-center">
+                <span>Total Size: <span id="total-size" class="font-medium text-zinc-700">14.2 MB</span></span>
+                <span class="flex items-center gap-1.5 text-zinc-600">
+                    <i class="ph-fill ph-check-circle text-brand-500 text-sm"></i> Ready to convert
+                </span>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- RIGHT PANEL: SETTINGS & ACTION             -->
+        <!-- ========================================== -->
+        <div class="w-[360px] bg-zinc-50/50 border-l border-zinc-100 flex flex-col shrink-0">
+            <div class="px-8 py-6 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center text-white">
+                        <i class="ph ph-arrows-left-right text-sm"></i>
+                    </div>
+                    <h1 class="font-semibold text-zinc-900 tracking-tight">ImgConv</h1>
+                </div>
+                <div class="flex gap-1 text-zinc-400 items-center">
+                    <button class="p-2 hover:text-zinc-900 rounded-md transition-colors" data-tooltip="Info">
+                        <i class="ph ph-info text-lg"></i>
+                    </button>
+                    <button id="theme-toggle" onclick="toggleTheme()"
+                        class="relative w-9 h-9 flex items-center justify-center hover:text-zinc-900 rounded-md transition-colors overflow-hidden"
+                        data-tooltip="Night Mode">
+                        <i id="icon-moon"
+                            class="ph ph-moon text-lg absolute transition-all duration-500 transform rotate-0 scale-100 opacity-100"></i>
+                        <i id="icon-sun"
+                            class="ph ph-sun text-lg absolute transition-all duration-500 transform -rotate-90 scale-0 opacity-0"></i>
+                    </button>
+                    <button onclick="toggleSettings()" class="p-2 hover:text-zinc-900 rounded-md transition-colors"
+                        data-tooltip="Settings">
+                        <i class="ph ph-gear text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-8 pb-8 flex flex-col gap-8">
+                <!-- Dropzone: Klik untuk testing tambah file -->
+                <div>
+                    <div onclick="simulateAddFile()"
+                        class="w-full h-40 border-2 border-dashed border-zinc-200 rounded-xl bg-white hover:border-brand-400 hover:bg-brand-50 flex flex-col items-center justify-center transition-colors cursor-pointer group active:scale-[0.98]">
+                        <div
+                            class="w-10 h-10 bg-zinc-100 text-zinc-500 rounded-full flex items-center justify-center group-hover:bg-brand-100 group-hover:text-brand-600 transition-colors mb-3">
+                            <i class="ph ph-upload-simple text-xl"></i>
+                        </div>
+                        <h3 class="font-medium text-sm text-zinc-700 group-hover:text-brand-700">Drop images here</h3>
+                        <p class="text-xs text-zinc-400 mt-1">PNG, JPG, WEBP, SVG</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-6">
+                    <div>
+                        <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-4">Output Settings
+                        </h3>
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-zinc-700 mb-2">Convert to</label>
+                            <div class="relative">
+                                <select
+                                    class="w-full appearance-none bg-white border border-zinc-200 text-zinc-900 py-2.5 px-3 pr-10 rounded-lg text-sm focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all cursor-pointer">
+                                    <option>WebP (Recommended)</option>
+                                    <option>JPEG</option>
+                                    <option>PNG</option>
+                                    <option>AVIF</option>
+                                </select>
+                                <div
+                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400">
+                                    <i class="ph ph-caret-down"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-zinc-700">Quality</label>
+                                <span class="text-xs font-medium text-zinc-500 bg-zinc-100 px-2 py-1 rounded">80%</span>
+                            </div>
+                            <input type="range" min="1" max="100" value="80"
+                                class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-800">
+                        </div>
+
+                        <label class="flex items-center gap-3 cursor-pointer group pt-1">
+                            <div class="relative flex items-center justify-center">
+                                <input type="checkbox" class="peer sr-only">
+                                <div
+                                    class="w-4 h-4 bg-white border border-zinc-300 rounded-[4px] peer-checked:bg-zinc-900 peer-checked:border-zinc-900 transition-all">
+                                </div>
+                                <i
+                                    class="ph ph-check text-white absolute opacity-0 peer-checked:opacity-100 text-[10px] font-bold"></i>
+                            </div>
+                            <span class="text-sm text-zinc-600 group-hover:text-zinc-900 transition-colors">Preserve
+                                EXIF Data</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-zinc-100 bg-white">
+                <button
+                    onclick="showToast('Processing images...', 'ph-fill ph-spinner-gap animate-spin text-brand-400')"
+                    class="w-full py-3 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2">
+                    Start Conversion
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SETTINGS & PREVIEW MODALS                  -->
+    <!-- ========================================== -->
+    <div id="settings-modal"
+        class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-zinc-900/20 backdrop-blur-sm" onclick="toggleSettings()"></div>
+        <div id="settings-content"
+            class="bg-white w-full max-w-sm rounded-2xl shadow-xl relative z-10 scale-95 transition-transform duration-300 overflow-hidden border border-zinc-100">
+            <div class="flex items-center justify-between p-5 border-b border-zinc-100">
+                <h3 class="font-medium text-zinc-900">Preferences</h3>
+                <button onclick="toggleSettings()" class="text-zinc-400 hover:text-zinc-900 transition-colors"><i
+                        class="ph ph-x text-lg"></i></button>
+            </div>
+            <div class="p-5 flex flex-col gap-5">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-medium text-zinc-800">Dark Mode</h4>
+                        <p class="text-xs text-zinc-500">Switch to dark theme</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div
+                            class="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900">
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="preview-modal"
+        class="fixed inset-0 z-[110] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm" onclick="closePreview()"></div>
+        <div class="relative z-10 max-w-5xl w-full p-6 flex flex-col items-center">
+            <div class="flex justify-end items-center w-full mb-4">
+                <button onclick="closePreview()"
+                    class="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 backdrop-blur-md transition-all shadow-sm">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <img id="preview-image" src="" alt="Preview"
+                class="max-h-[80vh] object-contain rounded-lg shadow-2xl ring-1 ring-white/10">
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // State
+        let mockFiles = [
+            { id: 1, name: 'DSC_0042_final_edit.png', size: 3.2, type: 'PNG', thumb: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=200&h=200', url: 'https://imgconv.app/wp-content/uploads/2024/02/dsc0042.png' },
+            { id: 2, name: 'bali_landscape_raw.jpg', size: 5.1, type: 'JPG', thumb: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&q=80&w=200&h=200', url: 'https://imgconv.app/wp-content/uploads/2024/02/bali.jpg' },
+            { id: 3, name: 'brand_logo_2024.svg', size: 0.12, type: 'SVG', thumb: 'https://images.unsplash.com/photo-1626908013351-800ddd734b8a?auto=format&fit=crop&q=80&w=200&h=200', url: 'https://imgconv.app/wp-content/uploads/2024/02/logo.svg' },
+            { id: 4, name: 'dashboard_ui_v2.png', size: 1.8, type: 'PNG', thumb: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=200&h=200', url: 'https://imgconv.app/wp-content/uploads/2024/02/dash.png' },
+            { id: 5, name: 'marketing_banner.jpg', size: 2.5, type: 'JPG', thumb: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=200&h=200', url: 'https://imgconv.app/wp-content/uploads/2024/02/banner.jpg' }
+        ];
+
+        let currentView = 'list';
+        const container = document.getElementById('file-container');
+        const btnList = document.getElementById('btn-list');
+        const btnGrid = document.getElementById('btn-grid');
+
+        // ==========================================
+        // FLUID FLIP ENGINE (Apple Core Animation Style)
+        // Menjamin animasi 100% mulus tanpa stretch/squish saat elemen bertambah atau dihapus
+        // ==========================================
+        function flipAnimate(containerEl, updateDOMCallback) {
+            // 1. Snapshot First (Ambil posisi awal)
+            const firstRects = new Map();
+            Array.from(containerEl.children).forEach(child => {
+                if (child.id) firstRects.set(child.id, child.getBoundingClientRect());
+            });
+            const oldChildren = Array.from(containerEl.children);
+
+            // 2. Lakukan perubahan nyata di DOM (tambah/hapus elemen HTML)
+            updateDOMCallback();
+
+            // 3. Snapshot Last (Ambil posisi tujuan akhir)
+            const lastRects = new Map();
+            const newChildren = Array.from(containerEl.children);
+            newChildren.forEach(child => {
+                if (child.id) lastRects.set(child.id, child.getBoundingClientRect());
+            });
+
+            // 4. Invert & Play (Transisi dari titik awal ke titik akhir)
+            newChildren.forEach(child => {
+                if (!child.id) return;
+                const first = firstRects.get(child.id);
+
+                if (first) {
+                    // Elemen masih ada, bergerak ke posisi baru
+                    const last = lastRects.get(child.id);
+                    const deltaX = first.left - last.left;
+                    const deltaY = first.top - last.top;
+
+                    if (deltaX !== 0 || deltaY !== 0) {
+                        child.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                        child.style.transition = 'none';
+
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                // Kurva easing ini menghasilkan pantulan natural ala Apple iOS
+                                child.style.transition = 'transform 0.45s cubic-bezier(0.32, 0.72, 0, 1)';
+                                child.style.transform = 'translate(0,0)';
+                                setTimeout(() => {
+                                    child.style.transition = '';
+                                    child.style.transform = '';
+                                }, 450);
+                            });
+                        });
+                    }
+                } else {
+                    // Elemen baru masuk (Pop In)
+                    child.style.opacity = '0';
+                    child.style.transform = 'scale(0.85) translateY(10px)';
+                    child.style.transition = 'none';
+
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            child.style.transition = 'all 0.4s cubic-bezier(0.32, 0.72, 0, 1)';
+                            child.style.opacity = '1';
+                            child.style.transform = 'scale(1) translateY(0)';
+                            setTimeout(() => {
+                                child.style.transition = '';
+                                child.style.transform = '';
+                            }, 400);
+                        });
+                    });
+                }
+            });
+
+            // 5. Animasi Out (Cloning elemen agar tidak ter-stretch di DOM)
+            let removeIndex = 0;
+            oldChildren.forEach(oldChild => {
+                if (oldChild.id && !lastRects.has(oldChild.id)) {
+                    const rect = firstRects.get(oldChild.id);
+                    const clone = oldChild.cloneNode(true);
+
+                    // Setup Clone agar melayang persis di posisi aslinya
+                    clone.style.position = 'absolute';
+                    clone.style.top = `${rect.top + window.scrollY}px`;
+                    clone.style.left = `${rect.left + window.scrollX}px`;
+                    clone.style.width = `${rect.width}px`;
+                    clone.style.height = `${rect.height}px`;
+                    clone.style.margin = '0';
+                    clone.style.zIndex = '50';
+                    clone.style.pointerEvents = 'none'; // Abaikan interaksi mouse
+                    clone.style.transition = 'none';
+
+                    document.body.appendChild(clone);
+
+                    // Beri jeda/stagger jika menghapus banyak item (seperti fungsi Clear All)
+                    const delay = removeIndex * 0.04;
+
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            clone.style.transition = `all 0.35s cubic-bezier(0.32, 0.72, 0, 1) ${delay}s`;
+                            clone.style.opacity = '0';
+                            clone.style.transform = 'scale(0.85)';
+                        });
+                    });
+
+                    // Hapus clone dari body jika animasi telah selesai
+                    setTimeout(() => clone.remove(), 400 + (delay * 1000));
+                    removeIndex++;
+                }
+            });
+        }
+
+        // ==========================================
+        // COMPONENT RENDERERS
+        // ==========================================
+
+        const getBadgeStyle = (type) => {
+            const styles = { 'PNG': 'bg-blue-50 text-blue-600 border-blue-200/50', 'JPG': 'bg-purple-50 text-purple-600 border-purple-200/50', 'SVG': 'bg-orange-50 text-orange-600 border-orange-200/50', 'GIF': 'bg-pink-50 text-pink-600 border-pink-200/50', 'WEBP': 'bg-emerald-50 text-emerald-600 border-emerald-200/50' };
+            return styles[type] || 'bg-zinc-100 text-zinc-600 border-zinc-200/50';
+        };
+
+        function generateHTML(file) {
+            const sizeStr = file.size >= 1 ? `${file.size.toFixed(1)} MB` : `${Math.round(file.size * 1024)} KB`;
+
+            if (currentView === 'list') {
+                return `
+                    <div id="file-${file.id}" class="item-card group flex items-center justify-between py-3 px-2 border-b border-zinc-100 last:border-0 hover:bg-zinc-50 rounded-lg cursor-default bg-white transition-colors duration-200">
+                        <div class="flex items-center gap-4">
+                            <div onclick="openPreview('${file.thumb}')" class="w-10 h-10 rounded bg-zinc-100 overflow-hidden shrink-0 border border-zinc-200/50 cursor-pointer relative group/thumb">
+                                <img src="${file.thumb}" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-zinc-900/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]"><i class="ph-fill ph-magnifying-glass-plus text-sm"></i></div>
+                            </div>
+                            <div class="flex flex-col">
+                                <h4 onclick="openPreview('${file.thumb}')" class="text-sm font-medium text-zinc-800 truncate max-w-[280px] hover:text-brand-600 cursor-pointer transition-colors" data-tooltip="Preview Image">${file.name}</h4>
+                                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-500">
+                                    <span class="font-medium px-1.5 py-0.5 rounded border ${getBadgeStyle(file.type)} uppercase tracking-wide leading-none">${file.type}</span>
+                                    <span class="w-1 h-1 bg-zinc-300 rounded-full"></span><span>${sizeStr}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="copyToClipboard('${file.url}', this)" class="w-8 h-8 rounded text-zinc-400 hover:text-brand-600 hover:bg-white border border-transparent hover:border-zinc-200 hover:shadow-sm flex items-center justify-center transition-all" data-tooltip="Copy URL"><i class="ph ph-link text-base"></i></button>
+                            <button onclick="deleteFile(${file.id})" class="w-8 h-8 rounded text-zinc-400 hover:text-red-600 hover:bg-white border border-transparent hover:border-zinc-200 hover:shadow-sm flex items-center justify-center transition-all" data-tooltip="Remove"><i class="ph ph-trash text-base"></i></button>
+                        </div>
+                    </div>`;
+            } else {
+                return `
+                    <div id="file-${file.id}" class="item-card group relative bg-white rounded-xl border border-zinc-200 overflow-hidden hover:border-zinc-300 hover:shadow-md flex flex-col cursor-default hover:-translate-y-1 transition-all duration-300">
+                        <div class="aspect-square bg-zinc-100 relative overflow-hidden">
+                            <img src="${file.thumb}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+                            <div class="absolute inset-0 z-10 bg-zinc-900/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[2px]">
+                                <button onclick="openPreview('${file.thumb}')" class="w-8 h-8 bg-white/90 hover:bg-white rounded text-zinc-700 hover:text-brand-600 flex items-center justify-center transition-all shadow-sm scale-95 hover:scale-105" data-tooltip-bottom="Preview"><i class="ph ph-eye text-base"></i></button>
+                                <button onclick="copyToClipboard('${file.url}', this)" class="w-8 h-8 bg-white/90 hover:bg-white rounded text-zinc-700 hover:text-brand-600 flex items-center justify-center transition-all shadow-sm scale-95 hover:scale-105" data-tooltip-bottom="Copy URL"><i class="ph ph-link text-base"></i></button>
+                                <button onclick="deleteFile(${file.id})" class="w-8 h-8 bg-white/90 hover:bg-white rounded text-zinc-700 hover:text-red-600 flex items-center justify-center transition-all shadow-sm scale-95 hover:scale-105" data-tooltip-bottom="Remove"><i class="ph ph-trash text-base"></i></button>
+                            </div>
+                            <div class="absolute top-2 left-2 text-[10px] font-semibold bg-white/90 backdrop-blur px-1.5 py-0.5 rounded uppercase tracking-wider border ${getBadgeStyle(file.type)}">${file.type}</div>
+                        </div>
+                        <div class="p-3">
+                            <h4 class="text-xs font-medium text-zinc-800 truncate" data-tooltip="${file.name}">${file.name}</h4>
+                            <p class="text-[11px] text-zinc-500 mt-0.5">${sizeStr}</p>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('file-count').textContent = mockFiles.length;
+            const totalMb = mockFiles.reduce((acc, file) => acc + file.size, 0);
+            document.getElementById('total-size').textContent = totalMb.toFixed(1) + ' MB';
+
+            const emptyStateId = 'empty-state-message';
+            const existingEmptyState = document.getElementById(emptyStateId);
+
+            if (mockFiles.length === 0 && !existingEmptyState) {
+                container.insertAdjacentHTML('beforeend', `<div id="${emptyStateId}" class="item-card w-full col-span-full py-16 flex flex-col items-center justify-center text-zinc-400">
+                    <i class="ph ph-empty text-4xl mb-2"></i><p class="text-sm">Queue is empty</p></div>`);
+            } else if (mockFiles.length > 0 && existingEmptyState) {
+                existingEmptyState.remove();
+            }
+        }
+
+        // ==========================================
+        // ACTION LOGICS (Membungkus perubahan dengan FLIP)
+        // ==========================================
+
+        function renderFiles(animate = false) {
+            const doRender = () => {
+                container.innerHTML = '';
+                container.className = currentView === 'list' ? 'flex flex-col gap-1 layout-transition' : 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 layout-transition';
+                mockFiles.forEach(file => container.insertAdjacentHTML('beforeend', generateHTML(file)));
+                updateStats();
+            };
+
+            if (animate) flipAnimate(container, doRender);
+            else doRender();
+        }
+
+        function simulateAddFile() {
+            const types = ['PNG', 'JPG', 'WEBP'];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const newFile = {
+                id: Date.now(),
+                name: `imported_image_${Math.floor(Math.random() * 1000)}.${randomType.toLowerCase()}`,
+                size: parseFloat((Math.random() * 4 + 0.5).toFixed(1)),
+                type: randomType,
+                thumb: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200&h=200',
+                url: 'https://imgconv.app/wp-content/uploads/new_upload.png'
+            };
+
+            mockFiles.unshift(newFile);
+
+            flipAnimate(container, () => {
+                updateStats();
+                container.insertAdjacentHTML('afterbegin', generateHTML(newFile));
+            });
+
+            showToast('File added to queue', 'ph-fill ph-plus-circle text-brand-400');
+        }
+
+        function deleteFile(id) {
+            flipAnimate(container, () => {
+                const element = document.getElementById(`file-${id}`);
+                if (element) element.remove();
+                mockFiles = mockFiles.filter(f => f.id !== id);
+                updateStats();
+            });
+            showToast('File removed', 'ph-fill ph-trash text-red-400');
+        }
+
+        function clearAll() {
+            if (mockFiles.length === 0) return;
+
+            flipAnimate(container, () => {
+                container.innerHTML = '';
+                mockFiles = [];
+                updateStats();
+            });
+            showToast('All files cleared', 'ph-fill ph-check-circle text-brand-400');
+        }
+
+        function setView(view) {
+            if (currentView === view) return;
+            currentView = view;
+
+            if (view === 'list') {
+                btnList.className = "p-2 text-zinc-900 bg-zinc-100 rounded-md transition-colors flex items-center justify-center";
+                btnGrid.className = "p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-md transition-colors flex items-center justify-center";
+            } else {
+                btnGrid.className = "p-2 text-zinc-900 bg-zinc-100 rounded-md transition-colors flex items-center justify-center";
+                btnList.className = "p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50 rounded-md transition-colors flex items-center justify-center";
+            }
+
+            renderFiles(true); // Animate morphing Layout
+        }
+
+        // ==========================================
+        // UI HELPERS (Toast, Preview, dll)
+        // ==========================================
+
+        let toastTimeout;
+        function showToast(message, iconClass = 'ph-fill ph-check-circle text-brand-400') {
+            const toast = document.getElementById('apple-toast');
+            document.getElementById('toast-message').textContent = message;
+            document.getElementById('toast-icon').className = `${iconClass} text-lg`;
+
+            toast.classList.remove('toast-exit');
+            void toast.offsetWidth;
+            toast.classList.add('toast-enter');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+            }, 2500);
+        }
+
+        function copyToClipboard(url, btn) {
+            const t = document.createElement("textarea"); t.value = url; t.style.opacity = "0"; document.body.appendChild(t); t.select();
+            try {
+                document.execCommand('copy');
+                const icon = btn.querySelector('i'); const orig = icon.className;
+                icon.className = 'ph-fill ph-check-circle text-brand-600';
+                setTimeout(() => { icon.className = orig; }, 2000);
+                showToast('URL Copied to clipboard', 'ph-fill ph-check-circle text-brand-400');
+            } catch (err) { showToast('Failed to copy', 'ph-fill ph-x-circle text-red-400'); }
+            document.body.removeChild(t);
+        }
+
+        function toggleTheme() {
+            const h = document.documentElement; const m = document.getElementById('icon-moon'); const s = document.getElementById('icon-sun');
+            h.classList.toggle('dark');
+            if (h.classList.contains('dark')) {
+                m.classList.replace('rotate-0', 'rotate-90'); m.classList.replace('scale-100', 'scale-0'); m.classList.replace('opacity-100', 'opacity-0');
+                s.classList.replace('-rotate-90', 'rotate-0'); s.classList.replace('scale-0', 'scale-100'); s.classList.replace('opacity-0', 'opacity-100');
+            } else {
+                s.classList.replace('rotate-0', '-rotate-90'); s.classList.replace('scale-100', 'scale-0'); s.classList.replace('opacity-100', 'opacity-0');
+                m.classList.replace('rotate-90', 'rotate-0'); m.classList.replace('scale-0', 'scale-100'); m.classList.replace('opacity-0', 'opacity-100');
+            }
+        }
+
+        function openPreview(src) {
+            document.getElementById('preview-image').src = src;
+            document.getElementById('preview-modal').classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => { document.getElementById('preview-image').src = ''; }, 300);
+        }
+
+        function toggleSettings() {
+            const m = document.getElementById('settings-modal'); const c = document.getElementById('settings-content');
+            if (m.classList.contains('opacity-0')) {
+                m.classList.remove('opacity-0', 'pointer-events-none'); c.classList.remove('scale-95'); c.classList.add('scale-100');
+            } else {
+                m.classList.add('opacity-0', 'pointer-events-none'); c.classList.remove('scale-100'); c.classList.add('scale-95');
+            }
+        }
+
+        // Initialize App
+        renderFiles(false);
+    </script>
+</body>
+
+</html>

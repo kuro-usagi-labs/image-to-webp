@@ -1,0 +1,79 @@
+{
+  "name": "image-to-webp-electron",
+  "version": "2.4.0",
+  "description": "Desktop app to convert images to WebP, AVIF, JPEG, and PNG",
+  "main": "electron-main.js",
+  "author": "Gilang",
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/start-electron.js",
+    "clean:dist": "node scripts/clean-dist.js",
+    "generate:icon": "node scripts/generate-icon.js",
+    "build:win": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
+    "build:portable": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable",
+    "build:win:signed": "node scripts/clean-dist.js && electron-builder --win --config.win.signAndEditExecutable=true",
+    "build:portable:signed": "node scripts/clean-dist.js && electron-builder --win portable --config.win.signAndEditExecutable=true",
+    "build:win:signed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-signed.ps1 -Target win",
+    "build:portable:signed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-signed.ps1 -Target portable",
+    "build:win:selfsigned:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-self-signed-local.ps1 -Target win",
+    "build:portable:selfsigned:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-self-signed-local.ps1 -Target portable"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.2.0",
+    "@fortawesome/free-regular-svg-icons": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "electron-positioner": "^4.1.0",
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.3",
+    "p-limit": "^7.3.0",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gilang.pngtowebp",
+    "productName": "Image to WebP",
+    "asar": true,
+    "files": [
+      "electron-main.js",
+      "preload.js",
+      "ui/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "win": {
+      "icon": "ui/webp2.ico",
+      "signAndEditExecutable": false,
+      "signtoolOptions": {
+        "publisherName": "Kuro Usagi"
+      },
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "ui/webp2.ico",
+      "uninstallerIcon": "ui/webp2.ico",
+      "installerHeaderIcon": "ui/webp2.ico"
+    }
+  }
+}

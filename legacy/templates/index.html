@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Convert images to WebP format">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+<body>
+  <div id="dropOverlay" class="drop-overlay">
+    <div class="drop-overlay-content">
+      <span class="drop-overlay-icon" data-icon="cloudArrowUp"></span>
+      <p class="drop-overlay-text">Drop gambar di sini</p>
+    </div>
+  </div>
+  <div class="app">
+    <header class="header">
+      <div class="app-title">
+        <span class="title-icon" data-icon="images"></span>
+        <span class="app-title-text">Image Converter</span>
+      </div>
+      <button id="aboutBtn" class="icon-btn" title="About">
+        <span class="icon-slot" data-icon="info"></span>
+      </button>
+      <button id="themeToggle" class="icon-btn" title="Ganti tema">
+        <span id="themeIcon" class="icon-slot"></span>
+      </button>
+      <button id="settingsBtn" class="icon-btn" title="Pengaturan">
+        <span class="icon-slot" data-icon="gear"></span>
+      </button>
+    </header>
+
+    <div id="dropzone" class="dropzone">
+      <span class="drop-icon" data-icon="cloudArrowUp"></span>
+      <p class="drop-main">Drop gambar di sini</p>
+      <p class="drop-sub">PNG - JPG - GIF - BMP - TIFF - AVIF - SVG</p>
+    </div>
+
+    <div class="action-row">
+      <button id="pickFilesBtn" class="btn-sm" title="Pilih file (Ctrl+O)">
+        <span class="icon-slot" data-icon="fileImage"></span>
+        Pilih File
+      </button>
+      <button id="pickFolderBtn" class="btn-sm" title="Pilih folder (Ctrl+Shift+O)">
+        <span class="icon-slot" data-icon="folderOpen"></span>
+        Pilih Folder
+      </button>
+    </div>
+
+    <div class="file-section">
+      <div class="file-header">
+        <span id="fileCount" class="file-count">File: <strong>0</strong></span>
+        <button id="clearAllBtn" class="clear-btn" title="Hapus semua file (Delete)">Hapus Semua</button>
+      </div>
+      <div id="fileList" class="file-list"></div>
+    </div>
+
+    <div class="bottom">
+      <div id="progressWrap" class="progress-wrap">
+        <div class="progress-track">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div class="progress-info">
+          <span id="progressText">0 / 0</span>
+          <span id="progressPct">0%</span>
+        </div>
+      </div>
+      <p id="status" class="status">Siap. Pilih gambar untuk memulai.</p>
+      <div class="bottom-actions">
+        <button id="openOutputBtn" class="secondary-btn" hidden title="Buka folder output">
+          <span class="icon-slot" data-icon="openExternal"></span>
+          Buka Output
+        </button>
+        <select id="outputFormat" class="format-select" title="Pilih format output">
+          <option value="webp" selected>WebP</option>
+          <option value="avif">AVIF</option>
+          <option value="jpeg">JPEG</option>
+          <option value="png">PNG</option>
+        </select>
+        <button id="convertBtn" class="convert-btn" disabled title="Konversi (Ctrl+Enter)">
+          <span class="icon-slot" data-icon="wand"></span>
+          Konversi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="aboutOverlay" class="about-overlay"></div>
+  <section id="aboutModal" class="about-modal" aria-hidden="true">
+    <div class="about-header">
+      <div class="about-header-copy">
+        <div class="about-title-row">
+          <span class="icon-slot about-title-icon" data-icon="images"></span>
+          <div>
+            <h2 class="about-title">Image Converter</h2>
+            <p class="about-subtitle">Compact desktop app for fast multi-format conversion.</p>
+          </div>
+        </div>
+      </div>
+      <button id="aboutClose" class="about-close" title="Tutup About">
+        <span class="icon-slot" data-icon="xmark"></span>
+      </button>
+    </div>
+
+    <div class="about-body">
+      <div class="about-card creator-card">
+        <div class="creator-photo-wrap">
+          <img id="aboutCreatorPhoto" class="creator-photo" src="assets/me.png" alt="Foto creator">
+          <div id="aboutCreatorFallback" class="creator-photo-fallback">
+            <span class="icon-slot" data-icon="circleUser"></span>
+          </div>
+        </div>
+        <div class="creator-copy">
+          <div class="creator-label">Creator</div>
+          <div class="creator-name">Gilang</div>
+          <p class="creator-role">Developer and creator of this desktop app.</p>
+        </div>
+      </div>
+
+      <div class="about-grid">
+        <div class="about-card">
+          <div class="about-card-label">App</div>
+          <div class="about-card-value">Version 1.3.0</div>
+          <p class="about-card-text">Built with Electron and Sharp for high-performance multi-format image conversion.
+          </p>
+        </div>
+        <div class="about-card">
+          <div class="about-card-label">Formats</div>
+          <div class="about-card-value">PNG, JPG, GIF, BMP, TIFF, AVIF, SVG</div>
+          <p class="about-card-text">Input gambar modern dan klasik, output ke WebP, AVIF, JPEG, atau PNG.</p>
+        </div>
+      </div>
+
+      <div class="about-card">
+        <div class="about-card-label">Changelog</div>
+        <ul class="changelog-list">
+          <li class="changelog-entry">
+            <span class="changelog-version">v1.3.0</span><br>
+            • Kustomisasi format output (AVIF, WebP, JPEG, PNG)<br>
+            • Sinkronisasi otomatis tema dengan OS<br>
+            • Detail penghematan ukuran file per gambar & total<br>
+            • Optimalisasi performa (concurrency limit)<br>
+            • Penyimpanan konfigurasi yang lebih aman
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v1.1.0</span><br>
+            • Indikator ceklis untuk konversi sukses<br>
+            • Skip file yang sudah dikonversi otomatis<br>
+            • Tombol 'Buka folder lokasi' per-file<br>
+            • Fitur Drag & Drop global (seluruh window)<br>
+            • Riwayat konversi (Logs) di tab Pengaturan<br>
+            • Animasi tombol interaktif & bouncy<br>
+            • Fix blank screen saat awal dibuka
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v1.0.0</span> — Rilis awal. Konversi batch gambar ke WebP dengan kontrol
+            kualitas.
+          </li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <div class="about-card-label">Keyboard Shortcuts</div>
+        <div class="about-shortcuts">
+          <div class="about-shortcut">
+            <span class="icon-slot" data-icon="keyboard"></span>
+            <span><strong>Ctrl+O</strong> pilih file</span>
+          </div>
+          <div class="about-shortcut">
+            <span class="icon-slot" data-icon="keyboard"></span>
+            <span><strong>Ctrl+Shift+O</strong> pilih folder</span>
+          </div>
+          <div class="about-shortcut">
+            <span class="icon-slot" data-icon="keyboard"></span>
+            <span><strong>Ctrl+Enter</strong> mulai konversi</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="settingsOverlay" class="settings-overlay"></div>
+  <aside id="settingsPanel" class="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title">Pengaturan</span>
+      <button id="settingsClose" class="settings-close" title="Tutup pengaturan">
+        <span class="icon-slot" data-icon="xmark"></span>
+      </button>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Output Folder</div>
+      <div id="settingsOutputPath" class="setting-value">Default: folder asal gambar</div>
+      <button id="settingsPickOutput" class="setting-btn setting-btn-top">
+        <span class="icon-slot" data-icon="folderOpen"></span>
+        Pilih Folder Output
+      </button>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Quality WebP</div>
+      <div class="quality-row">
+        <input id="quality" class="quality-slider" type="range" min="1" max="100" value="85">
+        <span id="qualityLabel" class="quality-val">85%</span>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Folder Mode</div>
+      <label class="toggle-row" for="preserveFolders">
+        <span class="toggle-copy">
+          <span class="toggle-title">
+            <span class="icon-slot" data-icon="folderTree"></span>
+            Pertahankan struktur folder
+          </span>
+          <span class="toggle-desc">Subfolder dari folder sumber akan dibuat ulang di output.</span>
+        </span>
+        <input id="preserveFolders" class="toggle-input" type="checkbox" checked>
+        <span class="toggle-switch"></span>
+      </label>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Conversion Logs</div>
+      <div id="settingsLogsEmpty" class="logs-empty">Belum ada file yang dikonversi.</div>
+      <div id="settingsLogsWrap" class="logs-wrap" hidden>
+        <table class="logs-table">
+          <thead>
+            <tr>
+              <th style="width: 35%;">Waktu</th>
+              <th style="width: 40%;">File</th>
+              <th style="width: 25%;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="settingsLogsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">Actions</div>
+      <button id="settingsClearAll" class="setting-btn danger">
+        <span class="icon-slot" data-icon="trash"></span>
+        Hapus Semua File
+      </button>
+    </div>
+
+    <div class="settings-footer">
+      <div>Image Converter v1.3.0 | Gilang</div>
+      <div>Ctrl+O | Ctrl+Shift+O | Ctrl+Enter</div>
+    </div>
+  </aside>
+
+  <div id="previewOverlay" class="preview-overlay"></div>
+  <section id="previewModal" class="preview-modal" aria-hidden="true">
+    <div class="preview-header">
+      <div class="preview-copy">
+        <div id="previewName" class="preview-name">Preview</div>
+        <div id="previewMeta" class="preview-meta">Pilih file untuk preview.</div>
+      </div>
+      <button id="previewClose" class="preview-close" title="Tutup preview">
+        <span class="icon-slot" data-icon="xmark"></span>
+      </button>
+    </div>
+    <div class="preview-stage">
+      <button id="previewPrev" class="preview-nav" title="Preview sebelumnya">
+        <span class="icon-slot" data-icon="chevronLeft"></span>
+      </button>
+      <div class="preview-frame">
+        <img id="previewImage" class="preview-image" alt="Preview file">
+        <div id="previewEmpty" class="preview-empty" hidden>
+          <span class="preview-empty-icon" data-icon="fileImage"></span>
+          <p id="previewEmptyText">Preview tidak tersedia untuk file ini.</p>
+        </div>
+      </div>
+      <button id="previewNext" class="preview-nav" title="Preview berikutnya">
+        <span class="icon-slot" data-icon="chevronRight"></span>
+      </button>
+    </div>
+  </section>
+
+  <script src="{{ url_for('static', filename='icons.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+
+</html>

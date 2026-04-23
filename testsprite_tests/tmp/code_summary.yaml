@@ -1,0 +1,61 @@
+version: "2"
+type: backend
+tech_stack:
+  - python
+  - flask
+  - pillow
+features:
+  - name: PNG to WebP Conversion API
+    description: Background jobs for converting PNG files to WebP format
+    files:
+      - app.py
+    endpoints:
+      - method: GET
+        path: /
+        description: Returns the main index page and cleans up old jobs
+        auth_required: false
+      - method: POST
+        path: /api/convert
+        description: Upload PNG files and start conversion job
+        auth_required: false
+        request_schema:
+          body:
+            files: file[]
+            quality: int
+        response_schema:
+          "200": 
+            job_id: string
+          "400": 
+            error: string
+      - method: GET
+        path: /api/progress/<job_id>
+        description: Check conversion progress for a job
+        auth_required: false
+        response_schema:
+          "200":
+            status: string
+            message: string
+            total: int
+            processed: int
+            success: int
+            failed: int
+          "404":
+            error: string
+      - method: GET
+        path: /api/download/<job_id>
+        description: Download the converted ZIP file
+        auth_required: false
+        response_schema:
+          "200": file
+          "400": 
+            error: string
+          "404": 
+            error: string
+      - method: DELETE
+        path: /api/job/<job_id>
+        description: Clean up job data
+        auth_required: false
+        response_schema:
+          "200": 
+            ok: boolean
+known_limitations: []

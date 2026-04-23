@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Convert images to WebP format">
+  <title>Image to WebP</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="dropOverlay" class="drop-overlay">
+    <div class="drop-overlay-content">
+      <span class="drop-overlay-icon" data-icon="cloudArrowUp"></span>
+      <p class="drop-overlay-text">Drop gambar di sini</p>
+      <p class="drop-overlay-sub">PNG, JPG, GIF, BMP, TIFF, AVIF, SVG</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <main class="app-shell">
+    <div class="app-frame">
+      <section class="queue-panel">
+        <header class="queue-header">
+          <div class="queue-heading">
+            <h1 class="queue-title">Queue</h1>
+            <p id="fileCount" class="queue-subtitle"><strong>0</strong> files ready</p>
+          </div>
+
+          <div class="queue-toolbar">
+            <div class="toolbar-group">
+              <button id="pickFilesBtn" class="toolbar-btn toolbar-btn--filled" data-tooltip="Pilih file (Ctrl+O)">
+                <span class="icon-slot" data-icon="fileImage"></span>
+                <span>File</span>
+              </button>
+              <button id="pickFolderBtn" class="toolbar-btn" data-tooltip="Pilih folder (Ctrl+Shift+O)">
+                <span class="icon-slot" data-icon="folderOpen"></span>
+                <span>Folder</span>
+              </button>
+            </div>
+
+            <div class="toolbar-divider" aria-hidden="true"></div>
+
+            <div class="toolbar-group toolbar-group--compact">
+              <button id="btnList" class="icon-btn icon-btn--active" data-tooltip="List View">
+                <span class="icon-slot" data-icon="clipboard"></span>
+              </button>
+              <button id="btnGrid" class="icon-btn" data-tooltip="Grid View">
+                <span class="icon-slot" data-icon="images"></span>
+              </button>
+            </div>
+
+            <button id="clearAllBtn" class="icon-btn icon-btn--danger" data-tooltip="Hapus semua file">
+              <span class="icon-slot" data-icon="xmark"></span>
+            </button>
+          </div>
+        </header>
+
+        <div class="queue-body">
+          <div id="fileList" class="file-list file-list--list"></div>
+        </div>
+
+        <footer class="queue-footer">
+          <div class="queue-footer-top">
+            <div class="footer-stat">
+              <span class="footer-label">Total Size</span>
+              <strong id="totalSize" class="footer-value">0 B</strong>
+            </div>
+
+            <div class="footer-ready">
+              <span class="footer-ready-icon" data-icon="circleCheck"></span>
+              <span>Ready to convert</span>
+            </div>
+          </div>
+
+          <div id="progressWrap" class="progress-wrap">
+            <div class="progress-track">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div class="progress-info">
+              <span id="progressText">0 / 0</span>
+              <span id="progressPct">0%</span>
+            </div>
+          </div>
+
+          <p id="status" class="status">Siap. Pilih gambar untuk memulai.</p>
+        </footer>
+      </section>
+
+      <aside class="control-panel">
+        <div class="control-panel-glow control-panel-glow--top"></div>
+        <div class="control-panel-glow control-panel-glow--bottom"></div>
+
+        <header class="control-header">
+          <div class="brand">
+            <div class="brand-mark">
+              <span class="icon-slot" data-icon="wand"></span>
+            </div>
+            <div class="brand-copy">
+              <span class="brand-name">ImgConv</span>
+              <span class="brand-sub">Desktop image converter</span>
+            </div>
+          </div>
+
+          <div class="control-actions">
+            <button id="aboutBtn" class="icon-btn icon-btn--ghost" data-tooltip="About">
+              <span class="icon-slot" data-icon="info"></span>
+            </button>
+            <button id="themeToggle" class="icon-btn icon-btn--ghost" data-tooltip="Ganti tema">
+              <span id="themeIcon" class="icon-slot"></span>
+            </button>
+            <button id="settingsBtn" class="icon-btn icon-btn--ghost" data-tooltip="Preferences">
+              <span class="icon-slot" data-icon="gear"></span>
+            </button>
+          </div>
+        </header>
+
+        <div class="control-body">
+          <button id="dropzone" class="dropzone" type="button">
+            <span class="dropzone-aura" aria-hidden="true"></span>
+            <span class="dropzone-icon" data-icon="cloudArrowUp"></span>
+            <span class="dropzone-title">Drop gambar di sini</span>
+            <span class="dropzone-subtitle">PNG, JPG, GIF, BMP, TIFF, AVIF, SVG</span>
+            <span class="dropzone-hint">Klik untuk memilih file dengan cepat.</span>
+          </button>
+
+          <section class="settings-card">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Output Settings</p>
+                <h2 class="section-title">Pengaturan Utama</h2>
+              </div>
+            </div>
+
+            <label class="field">
+              <span class="field-label">Format Tujuan</span>
+              <span class="select-wrap">
+                <select id="outputFormat" class="input-select" data-tooltip="Pilih format output">
+                  <option value="webp" selected>WebP</option>
+                  <option value="avif">AVIF</option>
+                  <option value="jpeg">JPEG</option>
+                  <option value="png">PNG</option>
+                </select>
+              </span>
+            </label>
+
+            <div class="field">
+              <div class="field-row">
+                <span class="field-label">Kualitas</span>
+                <span id="qualityLabel" class="field-badge">85%</span>
+              </div>
+              <input id="quality" class="input-range" type="range" min="1" max="100" value="85">
+            </div>
+
+            <label class="check-row" for="preserveFolders">
+              <input id="preserveFolders" class="check-input" type="checkbox" checked>
+              <span class="check-box"></span>
+              <span class="check-copy">
+                <span class="check-title">Pertahankan struktur folder</span>
+                <span class="check-subtitle">Subfolder akan dibuat ulang di output.</span>
+              </span>
+            </label>
+          </section>
+
+          <section class="settings-card settings-card--compact">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Output Folder</p>
+                <h2 class="section-title">Lokasi hasil konversi</h2>
+              </div>
+            </div>
+            <button id="quickOutputBtn" class="setting-action-btn"
+              style="width: 100%; justify-content: flex-start; margin-top: 8px; border: 1px solid var(--line); background: var(--surface-soft); padding: 12px; border-radius: 8px; text-align: left;">
+              <span class="icon-slot" data-icon="folder"
+                style="margin-right: 8px; color: var(--text-secondary);"></span>
+              <span id="quickOutputPath" class="path-preview"
+                style="margin: 0; display: inline-block; vertical-align: middle;">Default: folder asal gambar</span>
+            </button>
+            <p class="section-note" style="margin-top: 12px;">Atur folder output, WordPress, dan logs di Preferences.
+            </p>
+          </section>
+
+
+        </div>
+
+        <footer class="control-footer">
+          <button id="openOutputBtn" class="secondary-btn" data-tooltip="Buka folder output">
+            <span class="icon-slot" data-icon="openExternal"></span>
+            <span>Output</span>
+          </button>
+          <button id="cancelConvertBtn" class="secondary-btn" data-tooltip="Batal Konversi"
+            style="display: none; border-color: rgba(220, 38, 38, 0.4); color: var(--danger);">
+            <span class="icon-slot" data-icon="xmark"></span>
+            <span>Batal</span>
+          </button>
+          <button id="convertBtn" class="primary-btn" disabled data-tooltip="Konversi (Ctrl+Enter)">
+            <span class="icon-slot" data-icon="wand"></span>
+            <span>Konversi</span>
+          </button>
+        </footer>
+      </aside>
+    </div>
+  </main>
+
+  <div id="aboutOverlay" class="modal-overlay"></div>
+  <section id="aboutModal" class="about-modal" aria-hidden="true">
+    <div class="about-header">
+      <div class="about-title-row">
+        <span class="about-title-icon" data-icon="images"></span>
+        <div>
+          <h2 class="about-title">Image Converter</h2>
+          <p class="about-subtitle">Desktop app ringkas untuk konversi batch gambar dengan cepat.</p>
+        </div>
+      </div>
+      <button id="aboutClose" class="icon-btn icon-btn--ghost" data-tooltip="Tutup About">
+        <span class="icon-slot" data-icon="xmark"></span>
+      </button>
+    </div>
+
+    <div class="about-body">
+      <div class="about-card creator-card">
+        <div class="creator-photo-wrap">
+          <img id="aboutCreatorPhoto" class="creator-photo" src="assets/me.png" alt="Foto creator">
+          <div id="aboutCreatorFallback" class="creator-photo-fallback">
+            <span class="icon-slot" data-icon="images"></span>
+          </div>
+        </div>
+        <div class="creator-copy">
+          <div class="creator-label">Creator</div>
+          <div class="creator-name">Gilang</div>
+          <p class="creator-role">Developer and creator of this desktop app.</p>
+        </div>
+      </div>
+
+      <div class="about-grid">
+        <div class="about-card">
+          <div class="about-card-label">App</div>
+          <div class="about-card-value">Version 2.4.0</div>
+          <p class="about-card-text">Built with Electron and Sharp for multi-format image conversion.</p>
+        </div>
+        <div class="about-card">
+          <div class="about-card-label">Formats</div>
+          <div class="about-card-value">PNG, JPG, GIF, BMP, TIFF, AVIF, SVG</div>
+          <p class="about-card-text">Output ke WebP, AVIF, JPEG, atau PNG.</p>
+        </div>
+      </div>
+
+      <div class="about-card">
+        <div class="about-card-label">Changelog</div>
+        <ul class="changelog-list">
+          <li class="changelog-entry">
+            <span class="changelog-version">v2.4.0</span><br>
+            Sistem tooltip anti-clipping (JavaScript floating), preview gambar glassmorphism blur, dan semua emoji
+            diganti ikon SVG.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v2.3.0</span><br>
+            Async image loading anti-lag, skeleton placeholder, lazy IntersectionObserver, dan fade-in animasi
+            thumbnail.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v2.2.0</span><br>
+            Custom scrollbar, animasi tombol taktil, empty state premium, CSS tooltip, dan quick output folder picker.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v2.1.0</span><br>
+            Perbaikan keamanan repo, fix sinkronisasi tema tiga mode, cancel batch konversi, dan drag-drop folder
+            rekursif.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v2.0.0</span><br>
+            Auto-upload WordPress, HTML snippet ke clipboard, panel kredensial WP, dan test connection.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v1.3.0</span><br>
+            Dukungan format output baru, sinkronisasi tema, dan detail penghematan ukuran file.
+          </li>
+          <li class="changelog-entry">
+            <span class="changelog-version">v1.1.0</span><br>
+            Preview file, drag and drop global, riwayat konversi, dan perbaikan blank screen.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div id="settingsOverlay" class="modal-overlay"></div>
+  <section id="settingsPanel" class="settings-modal" aria-hidden="true">
+    <div class="settings-sidebar">
+      <div class="settings-sidebar-top">
+        <div class="settings-sidebar-title">Preferences</div>
+        <p class="settings-sidebar-sub">Pengaturan lanjutan aplikasi.</p>
+      </div>
+
+      <nav class="settings-nav">
+        <button class="settings-nav-item active" data-tab="general">
+          <span class="icon-slot" data-icon="gear"></span>
+          <span>General</span>
+        </button>
+        <button class="settings-nav-item" data-tab="output">
+          <span class="icon-slot" data-icon="folderOpen"></span>
+          <span>Output</span>
+        </button>
+        <button class="settings-nav-item" data-tab="wordpress">
+          <span class="icon-slot" data-icon="wordpress"></span>
+          <span>WordPress</span>
+        </button>
+        <button class="settings-nav-item" data-tab="logs">
+          <span class="icon-slot" data-icon="clipboard"></span>
+          <span>Logs</span>
+        </button>
+      </nav>
+
+      <div class="settings-sidebar-footer">v2.4.0 | Gilang</div>
+    </div>
+
+    <div class="settings-content">
+      <div class="settings-content-header">
+        <div>
+          <div class="section-kicker">Preferences</div>
+          <div id="settingsTabTitle" class="settings-content-title">General</div>
+        </div>
+        <button id="settingsClose" class="icon-btn icon-btn--ghost" data-tooltip="Tutup pengaturan">
+          <span class="icon-slot" data-icon="xmark"></span>
+        </button>
+      </div>
+
+      <div class="settings-pages">
+        <div class="settings-page active" data-page="general">
+          <div class="settings-block">
+            <h3 class="settings-block-title">Tentang panel utama</h3>
+            <p class="settings-block-copy">
+              Kontrol inti seperti format, kualitas, dan struktur folder ada langsung di panel kanan agar alur konversi
+              tetap cepat.
+            </p>
+          </div>
+
+          <div class="settings-block">
+            <h3 class="settings-block-title">Shortcut</h3>
+            <div class="shortcut-list">
+              <div class="shortcut-item">
+                <span class="shortcut-icon" data-icon="keyboard"></span>
+                <span>Ctrl+O untuk pilih file</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="shortcut-icon" data-icon="keyboard"></span>
+                <span>Ctrl+Shift+O untuk pilih folder</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="shortcut-icon" data-icon="keyboard"></span>
+                <span>Ctrl+Enter untuk mulai konversi</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-block settings-block--danger">
+            <div>
+              <h3 class="settings-block-title">Bersihkan antrean</h3>
+              <p class="settings-block-copy">Hapus semua file dari queue saat ini.</p>
+            </div>
+            <button id="settingsClearAll" class="setting-action-btn setting-action-btn--danger">Hapus Semua</button>
+          </div>
+        </div>
+
+        <div class="settings-page" data-page="output">
+          <div class="settings-block">
+            <h3 class="settings-block-title">Folder Output</h3>
+            <p class="settings-block-copy">Folder tujuan file hasil konversi.</p>
+            <div id="settingsOutputPath" class="setting-path-value">Default: folder asal gambar</div>
+          </div>
+
+          <button id="settingsPickOutput" class="setting-action-btn">
+            <span class="icon-slot" data-icon="folderOpen"></span>
+            <span>Pilih Folder</span>
+          </button>
+        </div>
+
+        <div class="settings-page" data-page="wordpress">
+          <div class="settings-block settings-block--split">
+            <div>
+              <h3 class="settings-block-title">Auto Upload</h3>
+              <p class="settings-block-copy">Upload otomatis ke WordPress setelah konversi.</p>
+            </div>
+            <label class="toggle-inline" for="wpAutoUpload">
+              <input id="wpAutoUpload" class="toggle-input" type="checkbox">
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+
+          <div class="wp-cred-fields">
+            <div class="wp-field">
+              <div class="field-row">
+                <span class="wp-field-label">Pilih Server (Preset)</span>
+                <button id="wpEditPresetBtn" class="icon-btn icon-btn--ghost" data-tooltip="Edit Data Preset" style="padding: 4px;">
+                  <span class="icon-slot" data-icon="gear" style="font-size: 14px;"></span>
+                </button>
+              </div>
+              <span class="select-wrap" style="width: 100%;">
+                <select id="wpPresetSelect" class="input-select">
+                  <option value="shoppnow">Shoppnow</option>
+                  <option value="primamarket">Prima Market</option>
+                  <option value="lazaramart">Lazara Mart</option>
+                  <option value="happymarket">Happy Market</option>
+                </select>
+              </span>
+            </div>
+          </div>
+
+          <div class="wp-actions-row">
+            <button id="wpTestConnection" class="setting-action-btn">
+              <span class="icon-slot" data-icon="globe"></span>
+              <span>Test Connection</span>
+            </button>
+            <span id="wpTestResult" class="wp-test-result"></span>
+          </div>
+        </div>
+
+        <div class="settings-page" data-page="logs">
+          <div id="settingsLogsEmpty" class="logs-empty">Belum ada file yang dikonversi.</div>
+          <div id="settingsLogsWrap" class="logs-wrap" hidden>
+            <table class="logs-table">
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>File</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="settingsLogsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="previewOverlay" class="preview-overlay"></div>
+  <section id="previewModal" class="preview-modal" aria-hidden="true">
+    <div class="preview-header">
+      <div class="preview-copy">
+        <div id="previewName" class="preview-name">Preview</div>
+        <div id="previewMeta" class="preview-meta">Pilih file untuk preview.</div>
+      </div>
+      <button id="previewClose" class="icon-btn icon-btn--light" data-tooltip="Tutup preview">
+        <span class="icon-slot" data-icon="xmark"></span>
+      </button>
+    </div>
+
+    <div class="preview-stage">
+      <button id="previewPrev" class="preview-nav" data-tooltip="Preview sebelumnya">
+        <span class="icon-slot" data-icon="chevronLeft"></span>
+      </button>
+
+      <div class="preview-frame">
+        <img id="previewImage" class="preview-image" alt="Preview file">
+        <div id="previewEmpty" class="preview-empty" hidden>
+          <span class="preview-empty-icon" data-icon="fileImage"></span>
+          <p id="previewEmptyText">Preview tidak tersedia untuk file ini.</p>
+        </div>
+      </div>
+
+      <button id="previewNext" class="preview-nav" data-tooltip="Preview berikutnya">
+        <span class="icon-slot" data-icon="chevronRight"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Modal Edit WP Preset -->
+  <div id="wpEditOverlay" class="modal-overlay" style="z-index: 1000;"></div>
+  <section id="wpEditModal" class="settings-modal" aria-hidden="true" style="z-index: 1001; max-width: 480px; height: auto;">
+    <div class="settings-content" style="width: 100%;">
+      <div class="settings-content-header">
+        <div>
+          <div class="section-kicker">Edit WP Configuration</div>
+          <div id="wpEditTitle" class="settings-content-title">Edit Preset</div>
+        </div>
+        <button id="wpEditClose" class="icon-btn icon-btn--ghost" data-tooltip="Tutup edit">
+          <span class="icon-slot" data-icon="xmark"></span>
+        </button>
+      </div>
+      <div class="settings-pages" style="padding: 0 24px 24px 24px;">
+        <div class="wp-cred-fields" style="margin-top: 16px;">
+          <label class="wp-field">
+            <span class="wp-field-label">WordPress URL</span>
+            <input id="editWpUrl" class="wp-input" type="url" placeholder="https://yourdomain.com" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="wp-field">
+            <span class="wp-field-label">Username</span>
+            <input id="editWpUsername" class="wp-input" type="text" placeholder="admin" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="wp-field">
+            <span class="wp-field-label">App Password</span>
+            <span class="wp-password-wrap">
+              <input id="editWpAppPassword" class="wp-input wp-input--password" type="password" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off" spellcheck="false">
+              <button id="editWpTogglePassword" class="wp-eye-btn" type="button" data-tooltip="Tampilkan password">
+                <span id="editWpEyeIcon" class="icon-slot" data-icon="eye"></span>
+              </button>
+            </span>
+          </label>
+          <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
+             <button id="editWpResetBtn" class="secondary-btn">Reset ke Default</button>
+             <button id="editWpSaveBtn" class="primary-btn">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div id="tooltipEl" class="tooltip-floating"></div>
+
+  <script src="icons.js"></script>
+  <script src="renderer.js"></script>
+</body>
+
+</html>

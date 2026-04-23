@@ -1,0 +1,26 @@
+node_modules/
+dist-electron/
+build/
+*.log
+
+# Python legacy
+venv/
+__pycache__/
+*.pyc
+
+# Secrets & environment
+*.env
+.env.*
+signing.env.local
+*.pfx
+*.p12
+opencode.json
+testserver.json
+
+# Error/debug artifacts
+error.txt
+build_error.txt
+
+# OS files
+Thumbs.db
+.DS_Store
