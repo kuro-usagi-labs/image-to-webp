@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>ImgConv image conversion</title>
+  <rect x="32" y="40" width="456" height="456" rx="112" fill="#191919"/>
+  <rect x="24" y="24" width="456" height="456" rx="112" fill="#d9ff43" stroke="#191919" stroke-width="16"/>
+  <rect x="90" y="104" width="306" height="270" rx="38" fill="#191919"/>
+  <rect x="78" y="90" width="306" height="270" rx="38" fill="#fffdf5" stroke="#191919" stroke-width="16"/>
+  <circle cx="294" cy="164" r="29" fill="#e795b7"/>
+  <path d="m110 310 81-110a12 12 0 0 1 19 0l53 72 24-30a12 12 0 0 1 19 0l48 68Z" fill="#191919"/>
+  <circle cx="358" cy="354" r="104" fill="#191919" stroke="#d9ff43" stroke-width="14"/>
+  <path d="M303 354h102m-39-39 39 39-39 39" fill="none" stroke="#d9ff43" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

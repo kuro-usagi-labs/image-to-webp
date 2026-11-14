@@ -1,5 +1,7 @@
 # Image to WebP
 
+<img src="ui/assets/app-icon.png" width="96" height="96" alt="Ikon ImgConv">
+
 **Aplikasi desktop Windows untuk mengonversi banyak gambar ke WebP, AVIF, JPEG, dan PNG — langsung di perangkat Anda.**
 
 [![Release](https://img.shields.io/github/v/release/kuro-usagi-labs/image-to-webp?color=d9ff43)](https://github.com/kuro-usagi-labs/image-to-webp/releases/latest)
@@ -15,13 +17,13 @@ Image to WebP, dengan antarmuka **ImgConv**, membantu menyiapkan foto produk, ga
 
 ## Unduh untuk Windows
 
-**Versi terbaru: v2.5.2 · Windows x64**
+**Versi terbaru: v2.5.3 · Windows x64**
 
 | Pilihan | Cocok untuk | Unduhan |
 | --- | --- | --- |
-| Installer | Pemakaian sehari-hari; pasang aplikasi melalui wizard Windows | [Image-to-WebP-Setup-2.5.2.exe](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.2/Image-to-WebP-Setup-2.5.2.exe) |
-| Portable | Menjalankan aplikasi tanpa instalasi | [Image-to-WebP-2.5.2.exe](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.2/Image-to-WebP-2.5.2.exe) |
-| Checksum | Memeriksa integritas file unduhan | [SHA256SUMS.txt](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.2/SHA256SUMS.txt) |
+| Installer | Pemakaian sehari-hari; pasang aplikasi melalui wizard Windows | [Image-to-WebP-Setup-2.5.3.exe](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.3/Image-to-WebP-Setup-2.5.3.exe) |
+| Portable | Menjalankan aplikasi tanpa instalasi | [Image-to-WebP-2.5.3.exe](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.3/Image-to-WebP-2.5.3.exe) |
+| Checksum | Memeriksa integritas file unduhan | [SHA256SUMS.txt](https://github.com/kuro-usagi-labs/image-to-webp/releases/download/v2.5.3/SHA256SUMS.txt) |
 
 [Lihat seluruh rilis dan catatan perubahan](https://github.com/kuro-usagi-labs/image-to-webp/releases) · [Changelog](CHANGELOG.md)
 
@@ -123,7 +125,7 @@ Hasil berada di `dist-electron/`: installer, portable, metadata update, blockmap
 Untuk memeriksa file yang sudah diunduh:
 
 ```powershell
-Get-FileHash .\Image-to-WebP-Setup-2.5.2.exe -Algorithm SHA256
+Get-FileHash .\Image-to-WebP-Setup-2.5.3.exe -Algorithm SHA256
 ```
 
 Bandingkan hasilnya dengan baris file yang sama di `SHA256SUMS.txt`.

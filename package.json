@@ -1,6 +1,6 @@
 {
   "name": "image-to-webp-electron",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "description": "Desktop app to convert images to WebP, AVIF, JPEG, and PNG",
   "main": "electron-main.js",
   "author": "Gilang",
@@ -78,7 +78,7 @@
       "buildResources": "build"
     },
     "win": {
-      "icon": "ui/webp2.ico",
+      "icon": "ui/app.ico",
       "signAndEditExecutable": true,
       "signExecutable": false,
       "signtoolOptions": {
@@ -103,9 +103,9 @@
       "artifactName": "Image-to-WebP-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "ui/webp2.ico",
-      "uninstallerIcon": "ui/webp2.ico",
-      "installerHeaderIcon": "ui/webp2.ico"
+      "installerIcon": "ui/app.ico",
+      "uninstallerIcon": "ui/app.ico",
+      "installerHeaderIcon": "ui/app.ico"
     },
     "portable": {
       "artifactName": "Image-to-WebP-${version}.${ext}"

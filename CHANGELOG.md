@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.3 - 2026-11-15
+
+- Ikon ImgConv baru: bingkai foto, panah konversi, aksen lime/pink, dan outline hitam.
+- Menyamakan ikon pada header, taskbar, tray, notifikasi, installer, dan uninstaller.
+- Generator ICO multi-resolusi 16-256 px dan PNG dari sumber SVG melalui `npm run generate:icon`.
+
 ## 2.5.2 - 2026-11-15
 
 - Menyusun ulang layout khusus alur konversi gambar: header ringkas, antrean utama yang mengisi ruang, sidebar pengaturan, dan dock aksi/progres yang tetap terlihat.

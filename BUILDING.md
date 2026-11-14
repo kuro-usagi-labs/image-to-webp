@@ -93,6 +93,10 @@ Catatan penting:
 - Build signed memerlukan environment Windows yang bisa menjalankan helper signing `electron-builder` dengan normal.
 - Jika mesin masih memblokir pembuatan symbolic link saat ekstraksi helper `winCodeSign`, jalankan dari Windows dengan Developer Mode aktif atau sesi yang memiliki privilege symlink yang sesuai.
 
+## Mengubah Ikon
+
+Edit `ui/assets/app-icon.svg`, lalu jalankan `npm run generate:icon` sebelum build. Generator memperbarui `ui/app.ico` dengan tujuh ukuran (16, 24, 32, 48, 64, 128, dan 256 px) serta `ui/assets/app-icon.png` untuk dokumentasi. Header menggunakan SVG yang sama; ikon Windows, tray, notifikasi, installer, dan uninstaller menggunakan ICO tersebut. Commit ketiga aset agar checkout baru dapat langsung dibuild.
+
 ## Build Self-Signed Untuk Testing Lokal
 
 Jika Anda hanya ingin testing lokal di Windows tanpa bergantung pada `winCodeSign`, gunakan workflow self-signed berikut:

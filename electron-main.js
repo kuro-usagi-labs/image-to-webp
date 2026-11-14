@@ -90,7 +90,7 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false,
     backgroundColor: "#f5f5f7",
-    icon: path.join(__dirname, "ui", "webp2.ico"),
+    icon: path.join(__dirname, "ui", "app.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -128,7 +128,7 @@ function createWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, "ui", "webp2.ico");
+  const iconPath = path.join(__dirname, "ui", "app.ico");
   tray = new Tray(iconPath);
   
   const contextMenu = Menu.buildFromTemplate([
@@ -198,14 +198,14 @@ async function convertImageBackground(filePath) {
     new Notification({
       title: "Konversi Selesai",
       body: `Berhasil mengubah ${path.basename(filePath)} ke WebP.`,
-      icon: path.join(__dirname, "ui", "webp2.ico")
+      icon: path.join(__dirname, "ui", "app.ico")
     }).show();
 
   } catch (err) {
     new Notification({
       title: "Konversi Gagal",
       body: `Gagal mengubah ${path.basename(filePath)}: ${err.message}`,
-      icon: path.join(__dirname, "ui", "webp2.ico")
+      icon: path.join(__dirname, "ui", "app.ico")
     }).show();
   }
 }
