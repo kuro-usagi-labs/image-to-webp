@@ -1,19 +1,50 @@
 # Building
 
+Runtime development memerlukan Windows x64 dan Node.js 26+. Install dependency dengan `npm ci`, lalu jalankan `node node_modules/electron/install.js` jika kebijakan npm menunda instalasi binary Electron.
+
 ## Build Lokal Unsigned
 
-Gunakan script berikut untuk build lokal biasa:
+Untuk paket lengkap (installer **dan** portable) dalam satu build:
 
 ```bash
 npm run build:win
-npm run build:portable
 ```
+
+Jika hanya memerlukan portable, gunakan `npm run build:portable` sebagai alternatif. Jangan menjalankannya setelah build lengkap jika installer masih diperlukan: setiap script membersihkan `dist-electron/` lebih dulu.
 
 Catatan:
 
 - Kedua script akan membersihkan folder `dist-electron/` terlebih dahulu.
 - Kedua script mematikan `CSC_IDENTITY_AUTO_DISCOVERY` agar build lokal tidak mencoba mencari sertifikat code signing otomatis.
-- Konfigurasi default project memakai `win.signAndEditExecutable=false` agar workflow build lokal tetap stabil di mesin Windows yang tidak punya privilege symlink untuk helper `winCodeSign`.
+- Konfigurasi default memakai `win.signAndEditExecutable=true` dan `win.signExecutable=false`: ikon dan metadata produk tetap diterapkan melalui resource editor, sementara code signing dinonaktifkan.
+- Build standar menggunakan `--publish never`; build lokal tidak membuat release secara otomatis.
+- Nama artefak: `Image-to-WebP-Setup-<version>.exe` dan `Image-to-WebP-<version>.exe`.
+
+Setelah build lengkap `build:win` selesai, buat checksum:
+
+```powershell
+npm run release:checksums
+```
+
+Script memerlukan installer, portable, blockmap installer, dan `latest.yml` versi yang sama. `SHA256SUMS.txt` ditulis hanya jika seluruh aset tersedia dan tidak kosong.
+
+## GitHub Release
+
+1. Perbarui versi pada `package.json`/lockfile, README, changelog, dan `docs/releases/v<version>.md`.
+2. Jalankan `npm test`, `npm run test:electron`, `npm run test:ui`, dan `npm audit` pada Windows.
+3. Commit/push source dan tag versi yang sesuai.
+4. Jalankan workflow manual **Publish Windows release** dengan tag tersebut. Workflow memeriksa versi, mengulang tes, membangun installer/portable, membuat checksum, mengunggah aset ke draft, lalu menerbitkannya.
+
+Workflow publikasi hanya dijalankan secara manual; push tag sendiri tidak membuat rilis duplikat. Token workflow menggunakan `GITHUB_TOKEN` dengan izin contents/write. Jangan menyimpan token di source.
+
+Untuk publikasi manual, unggah lima aset berikut melalui GitHub Releases:
+
+- Installer dan portable `.exe`.
+- Blockmap installer `.exe.blockmap`.
+- `latest.yml`.
+- `SHA256SUMS.txt`.
+
+Nama file installer pada `latest.yml` harus sama dengan nama aset release. Verifikasi hash/ukuran dan smoke test paket sebelum draft diterbitkan. Binary tidak dimasukkan ke riwayat Git.
 
 ## Build Signed
 
@@ -34,7 +65,7 @@ npm run build:portable:signed:local
 Script signed build akan:
 
 - membersihkan `dist-electron/` lebih dulu,
-- mengaktifkan kembali `signAndEditExecutable` khusus untuk proses build itu,
+- mengaktifkan `signExecutable=true` khusus untuk proses build itu,
 - membiarkan `electron-builder` memakai konfigurasi signing dari environment.
 
 Environment yang umum dipakai `electron-builder` untuk Windows:

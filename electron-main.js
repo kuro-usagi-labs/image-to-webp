@@ -1,9 +1,11 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme, clipboard, safeStorage, Menu, Tray, Notification } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme, Menu, Tray, Notification } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const child_process = require("node:child_process");
-const sharp = require("sharp");
+const { pathToFileURL } = require("node:url");
+const { convertImage, validateConversionOptions } = require("./lib/conversion");
+const { assertSettingKey, validateSetting, removeRetiredWordPressSettings } = require("./lib/settings");
 
 let store;
 const storeReady = (async () => {
@@ -11,6 +13,7 @@ const storeReady = (async () => {
     const StoreModule = await import("electron-store");
     const Store = StoreModule.default;
     store = new Store();
+    removeRetiredWordPressSettings(store);
   } catch (error) {
     console.error("Gagal initialize electron-store:", error);
   }
@@ -23,227 +26,9 @@ let tray = null;
 let isQuitting = false;
 
 const IMAGE_EXTENSIONS = [
-  ".png", ".jpg", ".jpeg", ".gif", ".bmp",
+  ".png", ".jpg", ".jpeg", ".gif",
   ".tiff", ".tif", ".webp", ".avif", ".svg"
 ];
-
-const WP_PASSWORDS_STORE_KEY = "wp-encrypted-passwords";
-const WP_LEGACY_PASSWORD_STORE_KEY = "wp-encrypted-password";
-const WP_OVERRIDES_STORE_KEY = "image-to-webp-wp-preset-overrides";
-const WP_PRESET_SELECT_STORE_KEY = "image-to-webp-wp-preset-select";
-
-let wpSecretsMigrated = false;
-
-function decodeStoredSecret(rawValue) {
-  const rawString = String(rawValue || "");
-  if (!rawString) {
-    return "";
-  }
-
-  if (safeStorage.isEncryptionAvailable()) {
-    try {
-      return safeStorage.decryptString(Buffer.from(rawString, "base64"));
-    } catch {
-      // Fallback for secrets that were stored without encryption.
-    }
-  }
-
-  return rawString;
-}
-
-function encodeStoredSecret(value) {
-  const normalized = String(value || "");
-  if (!normalized) {
-    return "";
-  }
-
-  if (safeStorage.isEncryptionAvailable()) {
-    return safeStorage.encryptString(normalized).toString("base64");
-  }
-
-  return normalized;
-}
-
-function sanitizeWpOverrides(rawValue) {
-  let parsed = rawValue;
-
-  if (!parsed) {
-    return {};
-  }
-
-  if (typeof parsed === "string") {
-    if (!parsed.trim()) {
-      return {};
-    }
-
-    try {
-      parsed = JSON.parse(parsed);
-    } catch {
-      return {};
-    }
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    return {};
-  }
-
-  const cleaned = {};
-
-  for (const [presetKey, value] of Object.entries(parsed)) {
-    if (!value || typeof value !== "object") {
-      continue;
-    }
-
-    const nextValue = {};
-    const wpUrl = String(value.wpUrl || "").trim();
-    const username = String(value.username || "").trim();
-
-    if (wpUrl) {
-      nextValue.wpUrl = wpUrl;
-    }
-
-    if (username) {
-      nextValue.username = username;
-    }
-
-    if (Object.keys(nextValue).length) {
-      cleaned[String(presetKey)] = nextValue;
-    }
-  }
-
-  return cleaned;
-}
-
-function sanitizeWpPasswordMap(rawValue) {
-  if (!rawValue || typeof rawValue !== "object") {
-    return {};
-  }
-
-  const cleaned = {};
-
-  for (const [presetKey, value] of Object.entries(rawValue)) {
-    const password = String(value || "").trim();
-    if (password) {
-      cleaned[String(presetKey)] = password;
-    }
-  }
-
-  return cleaned;
-}
-
-async function readStoredWpPasswordMap() {
-  await storeReady;
-  if (!store) {
-    return {};
-  }
-
-  const decoded = decodeStoredSecret(store.get(WP_PASSWORDS_STORE_KEY, ""));
-  if (!decoded) {
-    return {};
-  }
-
-  try {
-    return sanitizeWpPasswordMap(JSON.parse(decoded));
-  } catch {
-    return {};
-  }
-}
-
-async function writeStoredWpPasswordMap(passwordMap) {
-  await storeReady;
-  if (!store) {
-    return;
-  }
-
-  const cleaned = sanitizeWpPasswordMap(passwordMap);
-  if (!Object.keys(cleaned).length) {
-    store.delete(WP_PASSWORDS_STORE_KEY);
-    return;
-  }
-
-  store.set(WP_PASSWORDS_STORE_KEY, encodeStoredSecret(JSON.stringify(cleaned)));
-}
-
-async function ensureWpSecretsMigrated() {
-  if (wpSecretsMigrated) {
-    return;
-  }
-
-  await storeReady;
-  if (!store) {
-    wpSecretsMigrated = true;
-    return;
-  }
-
-  try {
-    const nextPasswords = await readStoredWpPasswordMap();
-    let passwordsChanged = false;
-
-    const legacyPassword = decodeStoredSecret(store.get(WP_LEGACY_PASSWORD_STORE_KEY, ""));
-    if (legacyPassword) {
-      const selectedPreset = String(store.get(WP_PRESET_SELECT_STORE_KEY, "shoppnow") || "shoppnow");
-      if (!nextPasswords[selectedPreset]) {
-        nextPasswords[selectedPreset] = legacyPassword;
-        passwordsChanged = true;
-      }
-    }
-    store.delete(WP_LEGACY_PASSWORD_STORE_KEY);
-
-    const rawOverrides = store.get(WP_OVERRIDES_STORE_KEY, "");
-    let parsedOverrides = rawOverrides;
-
-    if (typeof parsedOverrides === "string" && parsedOverrides.trim()) {
-      try {
-        parsedOverrides = JSON.parse(parsedOverrides);
-      } catch {
-        parsedOverrides = {};
-      }
-    } else if (!parsedOverrides) {
-      parsedOverrides = {};
-    }
-
-    if (parsedOverrides && typeof parsedOverrides === "object") {
-      const cleanedOverrides = {};
-
-      for (const [presetKey, value] of Object.entries(parsedOverrides)) {
-        if (!value || typeof value !== "object") {
-          continue;
-        }
-
-        const wpUrl = String(value.wpUrl || "").trim();
-        const username = String(value.username || "").trim();
-        const appPassword = String(value.appPassword || "").trim();
-
-        if (appPassword && nextPasswords[presetKey] !== appPassword) {
-          nextPasswords[presetKey] = appPassword;
-          passwordsChanged = true;
-        }
-
-        if (wpUrl || username) {
-          cleanedOverrides[String(presetKey)] = {};
-          if (wpUrl) {
-            cleanedOverrides[String(presetKey)].wpUrl = wpUrl;
-          }
-          if (username) {
-            cleanedOverrides[String(presetKey)].username = username;
-          }
-        }
-      }
-
-      if (Object.keys(cleanedOverrides).length) {
-        store.set(WP_OVERRIDES_STORE_KEY, JSON.stringify(cleanedOverrides));
-      } else {
-        store.delete(WP_OVERRIDES_STORE_KEY);
-      }
-    }
-
-    if (passwordsChanged) {
-      await writeStoredWpPasswordMap(nextPasswords);
-    }
-  } finally {
-    wpSecretsMigrated = true;
-  }
-}
 
 function initAutoUpdater() {
   if (autoUpdater || !app.isPackaged) {
@@ -278,6 +63,22 @@ function initAutoUpdater() {
   }
 }
 
+const UI_URL = pathToFileURL(path.join(__dirname, "ui", "index.html")).href;
+
+function isTrustedSender(event) {
+  return Boolean(mainWindow && !mainWindow.isDestroyed()
+    && event.sender === mainWindow.webContents
+    && event.senderFrame === mainWindow.webContents.mainFrame
+    && event.senderFrame?.url === UI_URL);
+}
+
+function handleIpc(channel, handler) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    if (!isTrustedSender(event)) throw new Error("Asal IPC tidak diizinkan.");
+    return handler(event, ...args);
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1220,
@@ -293,7 +94,9 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webviewTag: false
     }
   });
 
@@ -307,14 +110,21 @@ function createWindow() {
     }
   });
 
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+  mainWindow.webContents.on("will-frame-navigate", (event) => event.preventDefault());
+  mainWindow.webContents.on("will-attach-webview", (event) => event.preventDefault());
+  mainWindow.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  mainWindow.webContents.session.setPermissionCheckHandler(() => false);
+
   mainWindow.loadFile(path.join(__dirname, "ui", "index.html"));
 
-  ipcMain.once("app-ready", () => {
-    // Only show if we didn't launch hidden (from context menu)
-    if (mainWindow && !mainWindow.isDestroyed() && !process.argv.some(arg => arg === "--hidden")) {
-      mainWindow.show();
-    }
-  });
+  const showWhenReady = (event) => {
+    if (!isTrustedSender(event)) return;
+    ipcMain.removeListener("app-ready", showWhenReady);
+    if (!process.argv.includes("--hidden")) mainWindow.show();
+  };
+  ipcMain.on("app-ready", showWhenReady);
 }
 
 function createTray() {
@@ -359,7 +169,7 @@ function registerContextMenu() {
   const exePath = process.execPath;
   const command = `"${exePath}" "%1" "--hidden"`;
   
-  const exts = [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".avif"];
+  const exts = [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".avif"];
   
   exts.forEach((ext) => {
     const baseKey = `HKCU\\Software\\Classes\\SystemFileAssociations\\${ext}\\shell\\ConvertToWebP`;
@@ -377,16 +187,13 @@ async function convertImageBackground(filePath) {
   if (!isImage(filePath)) return;
 
   try {
-    const outputDir = path.dirname(filePath);
-    const baseName = path.basename(filePath, path.extname(filePath));
-    const dstPath = resolveUniqueOutputPath(outputDir, baseName, "webp");
-
-    let quality = 85;
-    if (store) quality = store.get("webp-quality", 85);
-
-    await sharp(filePath)
-      .webp({ quality, effort: 6 })
-      .toFile(dstPath);
+    await storeReady;
+    await convertImage({
+      sourcePath: filePath,
+      outputDir: path.dirname(filePath),
+      format: "webp",
+      quality: store?.get("image-to-webp-quality", 85) ?? 85
+    });
 
     new Notification({
       title: "Konversi Selesai",
@@ -403,7 +210,7 @@ async function convertImageBackground(filePath) {
   }
 }
 
-ipcMain.handle("check-updates", async () => {
+handleIpc("check-updates", async () => {
   if (!app.isPackaged) {
     return { ok: false, message: "Pengecekan update hanya tersedia pada aplikasi terpasang." };
   }
@@ -429,107 +236,27 @@ nativeTheme.on("updated", () => {
   if (mainWindow) mainWindow.webContents.send("theme-updated", nativeTheme.shouldUseDarkColors);
 });
 
-ipcMain.handle("get-system-theme", () => nativeTheme.shouldUseDarkColors);
+handleIpc("get-system-theme", () => nativeTheme.shouldUseDarkColors);
 
-ipcMain.handle("store-get", async (event, key, defaultValue) => {
-  await ensureWpSecretsMigrated();
+handleIpc("store-get", async (_event, key, defaultValue) => {
+  assertSettingKey(key);
   await storeReady;
-  if (!store) return defaultValue;
-  return store.get(key, defaultValue);
+  return store ? store.get(key, defaultValue) : defaultValue;
 });
 
-ipcMain.handle("store-set", async (event, key, value) => {
-  await ensureWpSecretsMigrated();
+handleIpc("store-set", async (_event, key, value) => {
+  const validated = validateSetting(key, value);
   await storeReady;
-  if (!store) {
-    return { ok: false, message: "Store not ready" };
-  }
-
-  if (String(key) === WP_OVERRIDES_STORE_KEY) {
-    const cleanedOverrides = sanitizeWpOverrides(value);
-    if (Object.keys(cleanedOverrides).length) {
-      store.set(key, JSON.stringify(cleanedOverrides));
-    } else {
-      store.delete(key);
-    }
-    return { ok: true };
-  }
-
-  store.set(key, value);
+  if (!store) return { ok: false, message: "Store not ready" };
+  store.set(key, validated);
   return { ok: true };
 });
 
-ipcMain.handle("store-delete", async (event, key) => {
-  await ensureWpSecretsMigrated();
+handleIpc("store-delete", async (_event, key) => {
+  assertSettingKey(key);
   await storeReady;
   if (store) store.delete(key);
   return { ok: true };
-});
-
-// --- Secure WP Password Storage via safeStorage ---
-ipcMain.handle("secrets:set-wp-password", async (_event, { presetKey, password }) => {
-  await ensureWpSecretsMigrated();
-  await storeReady;
-  if (!store) return { ok: false, message: "Store not ready" };
-
-  const normalizedPresetKey = String(presetKey || "").trim();
-  if (!normalizedPresetKey) {
-    return { ok: false, message: "Preset key wajib diisi." };
-  }
-
-  try {
-    const passwordMap = await readStoredWpPasswordMap();
-    const normalizedPassword = String(password || "").trim();
-
-    if (normalizedPassword) {
-      passwordMap[normalizedPresetKey] = normalizedPassword;
-    } else {
-      delete passwordMap[normalizedPresetKey];
-    }
-
-    await writeStoredWpPasswordMap(passwordMap);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, message: err.message };
-  }
-});
-
-ipcMain.handle("secrets:get-wp-password", async (_event, { presetKey } = {}) => {
-  await ensureWpSecretsMigrated();
-  await storeReady;
-  if (!store) return "";
-
-  const normalizedPresetKey = String(presetKey || "").trim();
-  if (!normalizedPresetKey) {
-    return "";
-  }
-
-  try {
-    const passwordMap = await readStoredWpPasswordMap();
-    return passwordMap[normalizedPresetKey] || "";
-  } catch {
-    return "";
-  }
-});
-
-ipcMain.handle("secrets:clear-wp-password", async (_event, { presetKey } = {}) => {
-  await ensureWpSecretsMigrated();
-  await storeReady;
-  if (!store) return { ok: false, message: "Store not ready" };
-
-  const normalizedPresetKey = String(presetKey || "").trim();
-  if (!normalizedPresetKey) {
-    return { ok: false, message: "Preset key wajib diisi." };
-  }
-
-  try {
-    const passwordMap = await readStoredWpPasswordMap();
-    delete passwordMap[normalizedPresetKey];
-    await writeStoredWpPasswordMap(passwordMap);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, message: err.message };
-  }
 });
 
 function isImage(filePath) {
@@ -554,22 +281,6 @@ async function collectImagesRecursive(folderPath) {
   }
 
   return output;
-}
-
-function resolveUniqueOutputPath(outputDir, baseName, ext) {
-  let target = path.join(outputDir, `${baseName}.${ext}`);
-  if (!fs.existsSync(target)) {
-    return target;
-  }
-
-  let index = 1;
-  while (true) {
-    target = path.join(outputDir, `${baseName}_${index}.${ext}`);
-    if (!fs.existsSync(target)) {
-      return target;
-    }
-    index += 1;
-  }
 }
 
 async function getFileSize(filePath) {
@@ -627,12 +338,12 @@ function formatBytes(bytes) {
   return `${parseFloat((bytes / Math.pow(1024, exponent)).toFixed(1))} ${units[exponent]}`;
 }
 
-ipcMain.handle("pick-image-files", async () => {
+handleIpc("pick-image-files", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Pilih File Gambar",
     properties: ["openFile", "multiSelections"],
     filters: [
-      { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif", "webp", "avif", "svg"] },
+      { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "tiff", "tif", "webp", "avif", "svg"] },
       { name: "All Files", extensions: ["*"] }
     ]
   });
@@ -644,7 +355,7 @@ ipcMain.handle("pick-image-files", async () => {
   return result.filePaths;
 });
 
-ipcMain.handle("pick-image-folder", async () => {
+handleIpc("pick-image-folder", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Pilih Folder Gambar",
     properties: ["openDirectory"]
@@ -662,7 +373,7 @@ ipcMain.handle("pick-image-folder", async () => {
   };
 });
 
-ipcMain.handle("scan-dropped-paths", async (_event, paths) => {
+handleIpc("scan-dropped-paths", async (_event, paths) => {
   const resultFiles = [];
   for (const p of paths) {
     try {
@@ -680,7 +391,7 @@ ipcMain.handle("scan-dropped-paths", async (_event, paths) => {
   return resultFiles;
 });
 
-ipcMain.handle("pick-output-folder", async () => {
+handleIpc("pick-output-folder", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: "Pilih Folder Output",
     properties: ["openDirectory", "createDirectory"]
@@ -693,14 +404,15 @@ ipcMain.handle("pick-output-folder", async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle("open-output-folder", async (_event, targetPath) => {
+handleIpc("open-output-folder", async (_event, targetPath) => {
   const resolvedPath = String(targetPath || "").trim();
   if (!resolvedPath) {
     return { ok: false, message: "Folder output belum dipilih." };
   }
 
   try {
-    await fs.promises.access(resolvedPath);
+    const stat = await fs.promises.stat(resolvedPath);
+    if (!stat.isDirectory()) return { ok: false, message: "Path output bukan folder." };
   } catch {
     return { ok: false, message: "Folder output tidak ditemukan." };
   }
@@ -713,13 +425,13 @@ ipcMain.handle("open-output-folder", async (_event, targetPath) => {
   return { ok: true };
 });
 
-ipcMain.handle("show-item-in-folder", async (_event, filePath) => {
+handleIpc("show-item-in-folder", async (_event, filePath) => {
   const resolved = String(filePath || "").trim();
   if (!resolved) return;
   shell.showItemInFolder(resolved);
 });
 
-ipcMain.handle("validate-output-folder", async (_event, targetPath) => {
+handleIpc("validate-output-folder", async (_event, targetPath) => {
   const resolvedPath = String(targetPath || "").trim();
   if (!resolvedPath) {
     return { ok: false, exists: false, message: "Folder output belum dipilih." };
@@ -737,7 +449,7 @@ ipcMain.handle("validate-output-folder", async (_event, targetPath) => {
   return { ok: true, exists: true, path: resolvedPath };
 });
 
-ipcMain.handle("get-file-sizes", async (_event, filePaths) => {
+handleIpc("get-file-sizes", async (_event, filePaths) => {
   const sizes = {};
   for (const filePath of filePaths) {
     sizes[filePath] = await getFileSize(filePath);
@@ -745,229 +457,81 @@ ipcMain.handle("get-file-sizes", async (_event, filePaths) => {
   return sizes;
 });
 
-let currentJobCancelled = false;
+let currentJob = null;
 
-ipcMain.handle("cancel-batch", async () => {
-  currentJobCancelled = true;
+handleIpc("cancel-batch", async () => {
+  if (currentJob) currentJob.cancelled = true;
   return { ok: true };
 });
 
-ipcMain.handle("convert-images", async (event, payload) => {
-  currentJobCancelled = false;
-  const pLimitModule = await import("p-limit");
-  const pLimit = pLimitModule.default;
-  const limit = pLimit(Math.max(1, os.cpus().length - 1));
-
+handleIpc("convert-images", async (event, payload) => {
+  if (currentJob) return { ok: false, message: "Batch konversi masih berjalan." };
+  let options;
+  try {
+    options = validateConversionOptions(payload?.format ?? "webp", payload?.quality ?? 85);
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
   const files = normalizePayloadFiles(Array.isArray(payload?.files) ? payload.files : []);
   const outputDir = String(payload?.outputDir || "").trim();
-  const quality = Math.max(1, Math.min(100, Number(payload?.quality || 85)));
   const preserveFolders = Boolean(payload?.preserveFolders);
-  const format = payload?.format || "webp";
+  if (!files.length) return { ok: false, message: "Tidak ada file gambar yang dipilih." };
 
-  if (!files.length) {
-    return { ok: false, message: "Tidak ada file gambar yang dipilih." };
-  }
-
-  if (outputDir) {
-    await fs.promises.mkdir(outputDir, { recursive: true });
-  }
-
-  let success = 0;
-  let failed = 0;
-  let totalOriginalSize = 0;
-  let totalOutputSize = 0;
-  const total = files.length;
-  const errors = [];
-  let currentIndex = 0;
-
-  const promises = files.map((file) => limit(async () => {
-    if (currentJobCancelled) return;
-    const { path: srcPath, rootDir } = file;
-    const baseName = path.basename(srcPath, path.extname(srcPath));
-    const targetDir = resolveOutputDirectory({
-      manualOutputDir: outputDir,
-      preserveFolders,
-      rootDir,
-      sourcePath: srcPath
-    });
-
-    await fs.promises.mkdir(targetDir, { recursive: true });
-    const dstPath = resolveUniqueOutputPath(targetDir, baseName, format);
-
-    let status = "";
-    let originalSize = 0;
-    let newSize = 0;
-
-    try {
-      originalSize = await getFileSize(srcPath);
-      totalOriginalSize += originalSize;
-
-      let sharpInstance = sharp(srcPath);
-      if (format === "webp") sharpInstance = sharpInstance.webp({ quality, effort: 6 });
-      else if (format === "avif") sharpInstance = sharpInstance.avif({ quality, effort: 6 });
-      else if (format === "jpeg") sharpInstance = sharpInstance.jpeg({ quality, mozjpeg: true });
-      else if (format === "png") sharpInstance = sharpInstance.png({ quality, compressionLevel: 9 });
-
-      await sharpInstance.toFile(dstPath);
-
-      newSize = await getFileSize(dstPath);
-      totalOutputSize += newSize;
-
-      success += 1;
-      const savedPct = originalSize > 0 ? Math.round((1 - newSize / originalSize) * 100) : 0;
-      status = `Berhasil: ${path.basename(srcPath)} (hemat ${savedPct}%)`;
-    } catch (error) {
-      failed += 1;
-      const errMsg = error?.message || "Unknown error";
-      status = `Gagal: ${path.basename(srcPath)} - ${errMsg}`;
-      errors.push({ file: path.basename(srcPath), error: errMsg });
-    }
-
-    currentIndex++;
-    event.sender.send("convert-progress", {
-      current: currentIndex,
-      total,
-      success,
-      failed,
-      status,
-      srcPath,
-      convertedOk: !status.startsWith("Gagal"),
-      originalSize,
-      newSize,
-      outputPath: dstPath,
-      outputFileName: path.basename(dstPath)
-    });
-  }));
-
-  await Promise.all(promises);
-
-  const cancelled = currentJobCancelled;
-  const processed = currentIndex;
-  const skipped = Math.max(0, total - processed);
-  const totalDelta = totalOriginalSize - totalOutputSize;
-  const deltaPct = totalOriginalSize > 0 ? Math.round((Math.abs(totalDelta) / totalOriginalSize) * 100) : 0;
-  const sizeMessage = totalDelta >= 0
-    ? `Hemat total: ${formatBytes(totalDelta)} (${deltaPct}%)`
-    : `Ukuran bertambah: ${formatBytes(Math.abs(totalDelta))} (${deltaPct}%)`;
-  const summaryMessage = cancelled
-    ? `Dibatalkan. Selesai diproses: ${processed}/${total}. Berhasil: ${success}, Gagal: ${failed}, Dilewati: ${skipped}. ${sizeMessage}`
-    : `Selesai. Berhasil: ${success}, Gagal: ${failed}. ${sizeMessage}`;
-
-  return {
-    ok: true,
-    cancelled,
-    processed,
-    skipped,
-    message: summaryMessage,
-    success,
-    failed,
-    total,
-    totalOriginalSize,
-    totalOutputSize,
-    totalDelta,
-    deltaPct,
-    outputDir,
-    errors
-  };
-});
-
-ipcMain.handle("upload-to-wordpress", async (_event, payload) => {
-  const { wpUrl, username, appPassword, filePath, fileName } = payload;
-
-  if (!wpUrl || !username || !appPassword) {
-    return { ok: false, message: "Kredensial WordPress belum diisi." };
-  }
-
-  const endpoint = `${wpUrl.replace(/\/+$/, "")}/wp-json/wp/v2/media`;
-  const authHeader = "Basic " + Buffer.from(`${username}:${appPassword}`).toString("base64");
-
-  let fileBuffer;
+  const job = { cancelled: false };
+  currentJob = job;
   try {
-    fileBuffer = await fs.promises.readFile(filePath);
-  } catch (err) {
-    return { ok: false, message: `Gagal membaca file: ${err.message}` };
-  }
-
-  const mimeTypes = {
-    ".webp": "image/webp",
-    ".avif": "image/avif",
-    ".jpeg": "image/jpeg",
-    ".jpg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif"
-  };
-  const ext = path.extname(fileName).toLowerCase();
-  const contentType = mimeTypes[ext] || "application/octet-stream";
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": authHeader,
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${fileName}"`
-      },
-      body: fileBuffer,
-      signal: AbortSignal.timeout(60000)
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => "");
-      let errorMsg = `HTTP ${response.status}`;
-      if (response.status === 401) errorMsg = "Unauthorized — cek Username & App Password.";
-      else if (response.status === 403) errorMsg = "Forbidden — cek izin/permission pengguna.";
-      else if (response.status === 404) errorMsg = "REST API tidak ditemukan — cek URL WordPress.";
-      else if (errorBody) {
-        try { errorMsg = JSON.parse(errorBody).message || errorMsg; } catch { }
+    const { default: pLimit } = await import("p-limit");
+    const limit = pLimit(Math.min(4, Math.max(1, os.cpus().length - 1)));
+    let success = 0;
+    let failed = 0;
+    let totalOriginalSize = 0;
+    let totalOutputSize = 0;
+    let processed = 0;
+    const total = files.length;
+    const errors = [];
+    await Promise.all(files.map(file => limit(async () => {
+      if (job.cancelled) return;
+      const { path: srcPath, rootDir } = file;
+      let convertedOk = false;
+      let converted = { outputPath: "", outputFileName: "", originalSize: 0, newSize: 0 };
+      let status;
+      try {
+        converted = await convertImage({
+          sourcePath: srcPath,
+          outputDir: resolveOutputDirectory({ manualOutputDir: outputDir, preserveFolders, rootDir, sourcePath: srcPath }),
+          ...options
+        });
+        convertedOk = true;
+        success += 1;
+        totalOriginalSize += converted.originalSize;
+        totalOutputSize += converted.newSize;
+        const savedPct = converted.originalSize ? Math.round((1 - converted.newSize / converted.originalSize) * 100) : 0;
+        status = `Berhasil: ${path.basename(srcPath)} (hemat ${savedPct}%)`;
+      } catch (error) {
+        failed += 1;
+        const message = error?.message || "Unknown error";
+        status = `Gagal: ${path.basename(srcPath)} - ${message}`;
+        errors.push({ file: path.basename(srcPath), error: message });
       }
-      return { ok: false, message: `Upload gagal: ${errorMsg}` };
-    }
-
-    const data = await response.json();
-    return {
-      ok: true,
-      sourceUrl: data.source_url || "",
-      mediaId: data.id || 0,
-      title: data.title?.rendered || fileName,
-      width: data.media_details?.width || 0,
-      height: data.media_details?.height || 0
-    };
-  } catch (err) {
-    if (err.name === "TimeoutError" || err.name === "AbortError") {
-      return { ok: false, message: "Upload timeout — server tidak merespons dalam 60 detik." };
-    }
-    return { ok: false, message: `Gagal menyambung ke server: ${err.message}` };
+      processed += 1;
+      if (!event.sender.isDestroyed()) event.sender.send("convert-progress", {
+        current: processed, total, success, failed, status, srcPath, convertedOk, ...converted
+      });
+    })));
+    const skipped = total - processed;
+    const totalDelta = totalOriginalSize - totalOutputSize;
+    const deltaPct = totalOriginalSize ? Math.round(Math.abs(totalDelta) / totalOriginalSize * 100) : 0;
+    const sizeMessage = totalDelta >= 0
+      ? `Hemat total: ${formatBytes(totalDelta)} (${deltaPct}%)`
+      : `Ukuran bertambah: ${formatBytes(Math.abs(totalDelta))} (${deltaPct}%)`;
+    const message = job.cancelled
+      ? `Dibatalkan. Selesai diproses: ${processed}/${total}. Berhasil: ${success}, Gagal: ${failed}, Dilewati: ${skipped}. ${sizeMessage}`
+      : `Selesai. Berhasil: ${success}, Gagal: ${failed}. ${sizeMessage}`;
+    return { ok: true, cancelled: job.cancelled, processed, skipped, message, success, failed,
+      total, totalOriginalSize, totalOutputSize, totalDelta, deltaPct, outputDir, errors };
+  } finally {
+    currentJob = null;
   }
-});
-
-ipcMain.handle("test-wp-connection", async (_event, payload) => {
-  const { wpUrl, username, appPassword } = payload;
-  const endpoint = `${wpUrl.replace(/\/+$/, "")}/wp-json/wp/v2/media?per_page=1`;
-  const authHeader = "Basic " + Buffer.from(`${username}:${appPassword}`).toString("base64");
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: { "Authorization": authHeader },
-      signal: AbortSignal.timeout(15000)
-    });
-
-    if (response.ok) return { ok: true, message: "Koneksi berhasil!" };
-    if (response.status === 401) return { ok: false, message: "Unauthorized — cek Username & App Password." };
-    if (response.status === 403) return { ok: false, message: "Forbidden — cek izin pengguna." };
-    if (response.status === 404) return { ok: false, message: "REST API tidak ditemukan — cek URL WordPress." };
-    return { ok: false, message: `Server merespons HTTP ${response.status}.` };
-  } catch (err) {
-    if (err.name === "TimeoutError" || err.name === "AbortError") {
-      return { ok: false, message: "Timeout — server tidak merespons." };
-    }
-    return { ok: false, message: `Gagal menyambung: ${err.message}` };
-  }
-});
-
-ipcMain.handle("copy-to-clipboard", async (_event, text) => {
-  clipboard.writeText(text);
-  return { ok: true };
 });
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -995,7 +559,6 @@ if (!gotTheLock) {
 
   app.whenReady().then(async () => {
     await storeReady;
-    await ensureWpSecretsMigrated();
     initAutoUpdater();
     createWindow();
     createTray();

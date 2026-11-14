@@ -27,12 +27,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("convert-progress", listener);
     return () => ipcRenderer.removeListener("convert-progress", listener);
   },
-  uploadToWordPress: (payload) => ipcRenderer.invoke("upload-to-wordpress", payload),
-  testWpConnection: (payload) => ipcRenderer.invoke("test-wp-connection", payload),
-  copyToClipboard: (text) => ipcRenderer.invoke("copy-to-clipboard", text),
-  setWpPassword: (presetKey, password) => ipcRenderer.invoke("secrets:set-wp-password", { presetKey, password }),
-  getWpPassword: (presetKey) => ipcRenderer.invoke("secrets:get-wp-password", { presetKey }),
-  clearWpPassword: (presetKey) => ipcRenderer.invoke("secrets:clear-wp-password", { presetKey }),
   cancelBatch: () => ipcRenderer.invoke("cancel-batch"),
   scanDroppedPaths: (paths) => ipcRenderer.invoke("scan-dropped-paths", paths)
 });

@@ -1,9 +1,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const sharp = require("sharp");
-const pngToIco = require("png-to-ico");
 
 async function generateIcon() {
+  const { default: pngToIco } = await import("png-to-ico");
   const buildDir = path.join(__dirname, "..", "build");
   await fs.promises.mkdir(buildDir, { recursive: true });
 

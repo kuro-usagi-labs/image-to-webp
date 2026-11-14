@@ -1,0 +1,55 @@
+name: Publish Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag, for example v2.5.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Check tag matches application version
+        run: node -e "if (process.env.RELEASE_TAG !== 'v'+require('./package.json').version) throw new Error('Tag and package version differ')"
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm test
+      - run: npm run test:electron
+      - run: npm run test:ui
+      - run: npm audit --audit-level=high
+      - run: npm run build:win
+      - run: npm run release:checksums
+      - name: Upload draft assets and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $assets = @(Get-ChildItem dist-electron -File | Where-Object { $_.Name -match '\.(exe|blockmap)$|^latest\.yml$|^SHA256SUMS\.txt$' } | ForEach-Object FullName)
+          $notes = Join-Path 'docs/releases' "$env:RELEASE_TAG.md"
+          $arguments = @('release', 'create', $env:RELEASE_TAG, '--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--draft', '--title', "Image to WebP $env:RELEASE_TAG")
+          if (Test-Path -LiteralPath $notes) { $arguments += @('--notes-file', $notes) } else { $arguments += '--generate-notes' }
+          & gh @arguments @assets
+          & gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false --latest

@@ -1,47 +1,77 @@
 {
   "name": "image-to-webp-electron",
-  "version": "2.4.0",
+  "version": "2.5.2",
   "description": "Desktop app to convert images to WebP, AVIF, JPEG, and PNG",
   "main": "electron-main.js",
   "author": "Gilang",
   "license": "MIT",
+  "homepage": "https://github.com/kuro-usagi-labs/image-to-webp#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuro-usagi-labs/image-to-webp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kuro-usagi-labs/image-to-webp/issues"
+  },
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:electron": "node scripts/run-electron-smoke.cjs",
     "start": "node scripts/start-electron.js",
     "clean:dist": "node scripts/clean-dist.js",
     "generate:icon": "node scripts/generate-icon.js",
-    "build:win": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
-    "build:portable": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable",
-    "build:win:signed": "node scripts/clean-dist.js && electron-builder --win --config.win.signAndEditExecutable=true",
-    "build:portable:signed": "node scripts/clean-dist.js && electron-builder --win portable --config.win.signAndEditExecutable=true",
+    "build:win": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --publish never",
+    "build:portable": "node scripts/clean-dist.js && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable --publish never",
+    "build:win:signed": "node scripts/clean-dist.js && electron-builder --win --config.win.signExecutable=true --publish never",
+    "build:portable:signed": "node scripts/clean-dist.js && electron-builder --win portable --config.win.signExecutable=true --publish never",
     "build:win:signed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-signed.ps1 -Target win",
     "build:portable:signed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-signed.ps1 -Target portable",
     "build:win:selfsigned:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-self-signed-local.ps1 -Target win",
-    "build:portable:selfsigned:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-self-signed-local.ps1 -Target portable"
+    "build:portable:selfsigned:local": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\build-self-signed-local.ps1 -Target portable",
+    "test:ui": "node scripts/run-electron-smoke.cjs --ui",
+    "release:checksums": "node scripts/release-checksums.cjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
     "@fortawesome/free-regular-svg-icons": "^7.2.0",
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
-    "electron-positioner": "^4.1.0",
-    "electron-store": "^11.0.2",
-    "electron-updater": "^6.8.3",
+    "electron-store": "^12.0.0",
+    "electron-updater": "^6.8.11",
     "p-limit": "^7.3.0",
-    "png-to-ico": "^2.1.8",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
+    "axe-core": "^4.14.0",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "jsdom": "^31.0.1",
+    "png-to-ico": "^3.0.2"
+  },
+  "overrides": {
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.8"
   },
   "build": {
     "appId": "com.gilang.pngtowebp",
     "productName": "Image to WebP",
     "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kuro-usagi-labs",
+        "repo": "image-to-webp"
+      }
+    ],
     "files": [
       "electron-main.js",
       "preload.js",
+      "lib/**/*.js",
       "ui/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "directories": {
       "output": "dist-electron",
@@ -49,7 +79,8 @@
     },
     "win": {
       "icon": "ui/webp2.ico",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
+      "signExecutable": false,
       "signtoolOptions": {
         "publisherName": "Kuro Usagi"
       },
@@ -69,11 +100,15 @@
       ]
     },
     "nsis": {
+      "artifactName": "Image-to-WebP-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "ui/webp2.ico",
       "uninstallerIcon": "ui/webp2.ico",
       "installerHeaderIcon": "ui/webp2.ico"
+    },
+    "portable": {
+      "artifactName": "Image-to-WebP-${version}.${ext}"
     }
   }
 }

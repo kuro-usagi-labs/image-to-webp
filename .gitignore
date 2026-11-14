@@ -1,7 +1,16 @@
 node_modules/
 dist-electron/
+dist-verified/
+artifacts/ui/
+.release/
 build/
 *.log
+
+# Local audits, assistant working notes, and development-service configuration
+/AUDIT-*.md
+/UI-*.md
+/docs/superpowers/
+/testsprite_tests/
 
 # Python legacy
 venv/

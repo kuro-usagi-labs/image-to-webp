@@ -23,6 +23,7 @@ const quality = $("quality");
 const qualityLabel = $("qualityLabel");
 const preserveFolders = $("preserveFolders");
 const outputFormat = $("outputFormat");
+const formatChoices = document.querySelectorAll('input[name="output-format"]');
 const btnList = $("btnList");
 const btnGrid = $("btnGrid");
 const totalSizeEl = $("totalSize");
@@ -60,24 +61,22 @@ const STORAGE_KEYS = {
   outputDir: "image-to-webp-output-dir",
   quality: "image-to-webp-quality",
   preserveFolders: "image-to-webp-preserve-folders",
-  outputFormat: "image-to-webp-output-format",
-  wpAutoUpload: "image-to-webp-wp-auto-upload",
-  wpPresetSelect: "image-to-webp-wp-preset-select",
-  wpPresetOverrides: "image-to-webp-wp-preset-overrides"
+  outputFormat: "image-to-webp-output-format"
 };
 
 const IMAGE_EXTENSIONS = [
-  ".png", ".jpg", ".jpeg", ".gif", ".bmp",
+  ".png", ".jpg", ".jpeg", ".gif",
   ".tiff", ".tif", ".webp", ".avif", ".svg"
 ];
 
 const PREVIEWABLE_EXTENSIONS = new Set([
-  ".png", ".jpg", ".jpeg", ".gif", ".bmp",
+  ".png", ".jpg", ".jpeg", ".gif",
   ".webp", ".avif", ".svg"
 ]);
 
 let selectedFiles = [];
 let outputDir = "";
+let lastOutputPath = "";
 let isConverting = false;
 let previewIndex = -1;
 let nextFileId = 1;
@@ -89,28 +88,7 @@ const conversionLogs = [];
 const dropOverlay = $("dropOverlay");
 const toastEl = $("toast");
 
-// WordPress DOM refs
-const wpAutoUpload = $("wpAutoUpload");
-const wpPresetSelect = $("wpPresetSelect");
-const wpEditPresetBtn = $("wpEditPresetBtn");
-const wpTestConnection = $("wpTestConnection");
-const wpTestResult = $("wpTestResult");
-
-// Edit WP Modal DOM refs
-const wpEditOverlay = $("wpEditOverlay");
-const wpEditModal = $("wpEditModal");
-const wpEditClose = $("wpEditClose");
-const wpEditTitle = $("wpEditTitle");
-const editWpUrl = $("editWpUrl");
-const editWpUsername = $("editWpUsername");
-const editWpAppPassword = $("editWpAppPassword");
-const editWpTogglePassword = $("editWpTogglePassword");
-const editWpEyeIcon = $("editWpEyeIcon");
-const editWpResetBtn = $("editWpResetBtn");
-const editWpSaveBtn = $("editWpSaveBtn");
-
 let toastTimer = null;
-const collectedHtmlSnippets = [];
 
 function iconMarkup(name, extraClass = "") {
   const markup = window.APP_ICONS?.[name] || "";
@@ -186,6 +164,10 @@ function isDialogOpen() {
     || previewModal.classList.contains("open");
 }
 
+function syncDialogInert() {
+  document.querySelector("main").inert = isDialogOpen();
+}
+
 function isEditableTarget(target) {
   if (!target) return false;
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
@@ -225,15 +207,21 @@ function toggleTheme() {
 
 function openSettings() {
   closeAbout();
+  closePreview();
   settingsPanel.classList.add("open");
   settingsOverlay.classList.add("open");
   settingsPanel.setAttribute("aria-hidden", "false");
+  syncDialogInert();
+  settingsClose.focus();
 }
 
 function closeSettings() {
+  const wasOpen = settingsPanel.classList.contains("open");
   settingsPanel.classList.remove("open");
   settingsOverlay.classList.remove("open");
   settingsPanel.setAttribute("aria-hidden", "true");
+  syncDialogInert();
+  if (wasOpen) settingsBtn.focus();
 }
 
 function switchSettingsTab(tabName) {
@@ -246,7 +234,7 @@ function switchSettingsTab(tabName) {
     page.classList.toggle("active", page.dataset.page === tabName);
   });
   // Update title
-  const titles = { general: "General", output: "Output", wordpress: "WordPress", logs: "Logs" };
+  const titles = { general: "General", output: "Output", logs: "Logs" };
   if (settingsTabTitle) settingsTabTitle.textContent = titles[tabName] || tabName;
 }
 
@@ -256,12 +244,17 @@ function openAbout() {
   aboutOverlay.classList.add("open");
   aboutModal.classList.add("open");
   aboutModal.setAttribute("aria-hidden", "false");
+  syncDialogInert();
+  aboutClose.focus();
 }
 
 function closeAbout() {
+  const wasOpen = aboutModal.classList.contains("open");
   aboutOverlay.classList.remove("open");
   aboutModal.classList.remove("open");
   aboutModal.setAttribute("aria-hidden", "true");
+  syncDialogInert();
+  if (wasOpen) aboutBtn.focus();
 }
 
 function syncAboutCreatorPhoto() {
@@ -270,29 +263,37 @@ function syncAboutCreatorPhoto() {
   aboutCreatorFallback.hidden = hasLoadedPhoto;
 }
 
+let previewReturnFocus = null;
+
 function openPreview(index) {
   if (index < 0 || index >= selectedFiles.length) return;
   closeSettings();
   closeAbout();
+  previewReturnFocus = document.activeElement;
   previewIndex = index;
   previewOverlay.classList.add("open");
   previewModal.classList.add("open");
   previewModal.setAttribute("aria-hidden", "false");
+  syncDialogInert();
+  previewClose.focus();
   renderPreview();
 }
 
 function closePreview() {
+  const wasOpen = previewModal.classList.contains("open");
   previewIndex = -1;
   previewOverlay.classList.remove("open");
   previewModal.classList.remove("open");
   previewModal.setAttribute("aria-hidden", "true");
+  syncDialogInert();
+  if (wasOpen && previewReturnFocus?.isConnected) previewReturnFocus.focus();
   previewImage.classList.remove("visible");
   previewImage.removeAttribute("src");
 }
 
 function updateFileCount() {
-  const label = selectedFiles.length === 1 ? "file ready" : "files ready";
-  fileCountEl.innerHTML = `<strong>${selectedFiles.length}</strong> ${label}`;
+  fileCountEl.innerHTML = `<strong>${selectedFiles.length}</strong> gambar dalam antrean`;
+  document.querySelector(".queue-panel").classList.toggle("has-files", selectedFiles.length > 0);
 }
 
 function updateTotalSize() {
@@ -316,7 +317,7 @@ function setView(view) {
 }
 
 function updateOutputUI() {
-  const outputText = outputDir || "Default: folder asal gambar";
+  const outputText = outputDir || "Folder asal gambar";
   settingsOutputPath.textContent = outputText;
   settingsOutputPath.title = outputDir || "";
   if (quickOutputPath) {
@@ -335,8 +336,12 @@ function updateControls() {
   settingsClearAll.disabled = isConverting || !hasFiles;
   settingsPickOutput.disabled = isConverting;
   quality.disabled = isConverting;
+  outputFormat.disabled = isConverting;
+  formatChoices.forEach(choice => { choice.disabled = isConverting; });
+  dropzone.disabled = isConverting;
+  if (quickOutputBtn) quickOutputBtn.disabled = isConverting;
   preserveFolders.disabled = isConverting;
-  openOutputBtn.disabled = !outputDir;
+  openOutputBtn.disabled = !outputDir && !lastOutputPath;
   convertBtn.disabled = isConverting || !hasFiles || unconvertedCount === 0;
 
   if (isConverting) {
@@ -350,6 +355,7 @@ function updateControls() {
 
 function setStatus(message, type = "") {
   statusEl.textContent = message;
+  statusEl.title = message;
   statusEl.className = "status";
   if (type) statusEl.classList.add(type);
 }
@@ -376,252 +382,6 @@ function showToast(messageHtml, type = "", duration = 3500) {
   }
 }
 
-const WP_PRESETS_DEFAULT = {
-  shoppnow: { name: "Shoppnow", wpUrl: "https://shoppnow.my.id", username: "admin_shoppnow" },
-  primamarket: { name: "Prima Market", wpUrl: "https://primamarket.my.id", username: "admin_primamarket" },
-  lazaramart: { name: "Lazara Mart", wpUrl: "https://lazaramart.my.id/", username: "admin_lazaramart" },
-  happymarket: { name: "Happy Market", wpUrl: "https://happymarket.my.id/", username: "admin_happymarket" }
-};
-const WP_PRESET_KEYS = Object.keys(WP_PRESETS_DEFAULT);
-let wpOverrides = {};
-let wpPasswords = {};
-
-function sanitizeWpOverrides(rawValue) {
-  let parsed = rawValue;
-
-  if (!parsed) {
-    return {};
-  }
-
-  if (typeof parsed === "string") {
-    if (!parsed.trim()) {
-      return {};
-    }
-
-    try {
-      parsed = JSON.parse(parsed);
-    } catch {
-      return {};
-    }
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    return {};
-  }
-
-  const cleaned = {};
-
-  for (const [presetKey, value] of Object.entries(parsed)) {
-    if (!value || typeof value !== "object") {
-      continue;
-    }
-
-    const nextValue = {};
-    const wpUrl = String(value.wpUrl || "").trim();
-    const username = String(value.username || "").trim();
-
-    if (wpUrl) {
-      nextValue.wpUrl = wpUrl;
-    }
-
-    if (username) {
-      nextValue.username = username;
-    }
-
-    if (Object.keys(nextValue).length) {
-      cleaned[String(presetKey)] = nextValue;
-    }
-  }
-
-  return cleaned;
-}
-
-function getWpPresetKey(presetKey = null) {
-  const requestedKey = String(presetKey || wpPresetSelect?.value || "").trim();
-  if (requestedKey && WP_PRESETS_DEFAULT[requestedKey]) {
-    return requestedKey;
-  }
-  return WP_PRESET_KEYS[0] || "shoppnow";
-}
-
-async function refreshWpPassword(presetKey = null) {
-  const key = getWpPresetKey(presetKey);
-  try {
-    const password = await window.electronAPI.getWpPassword(key);
-    wpPasswords[key] = String(password || "");
-  } catch {
-    wpPasswords[key] = "";
-  }
-  return wpPasswords[key] || "";
-}
-
-async function loadAllWpPasswords() {
-  for (const key of WP_PRESET_KEYS) {
-    await refreshWpPassword(key);
-  }
-}
-
-function buildPersistedWpOverrides() {
-  return sanitizeWpOverrides(wpOverrides);
-}
-
-async function persistWpOverrides() {
-  const cleaned = buildPersistedWpOverrides();
-  wpOverrides = cleaned;
-
-  if (!Object.keys(cleaned).length) {
-    await window.electronAPI.deleteStoreValue(STORAGE_KEYS.wpPresetOverrides);
-    return;
-  }
-
-  await window.electronAPI.setStoreValue(STORAGE_KEYS.wpPresetOverrides, JSON.stringify(cleaned));
-}
-
-function getWpCredentials(presetKey = null) {
-  const key = getWpPresetKey(presetKey);
-  const defaults = WP_PRESETS_DEFAULT[key] || { wpUrl: "", username: "" };
-  const overrides = wpOverrides[key] || {};
-  return {
-    wpUrl: overrides.wpUrl || defaults.wpUrl || "",
-    username: overrides.username || defaults.username || "",
-    appPassword: wpPasswords[key] || ""
-  };
-}
-
-function isWpConfigured(presetKey = null) {
-  const cred = getWpCredentials(presetKey);
-  return Boolean(cred.wpUrl && cred.username && cred.appPassword);
-}
-
-function resetWpPasswordVisibility() {
-  editWpAppPassword.type = "password";
-  editWpEyeIcon.innerHTML = iconMarkup("eye");
-}
-
-async function openWpEditModal() {
-  const key = getWpPresetKey();
-  const cred = getWpCredentials(key);
-  wpEditTitle.textContent = `Edit Preset: ${WP_PRESETS_DEFAULT[key].name}`;
-  editWpUrl.value = cred.wpUrl;
-  editWpUsername.value = cred.username;
-  editWpAppPassword.value = await refreshWpPassword(key);
-  resetWpPasswordVisibility();
-
-  wpEditOverlay.classList.add("open");
-  wpEditModal.classList.add("open");
-  wpEditModal.setAttribute("aria-hidden", "false");
-}
-
-function closeWpEditModal() {
-  wpEditOverlay.classList.remove("open");
-  wpEditModal.classList.remove("open");
-  wpEditModal.setAttribute("aria-hidden", "true");
-  resetWpPasswordVisibility();
-}
-
-async function saveWpPresetData() {
-  const key = getWpPresetKey();
-  const defaults = WP_PRESETS_DEFAULT[key] || { wpUrl: "", username: "" };
-  const nextPassword = editWpAppPassword.value.trim();
-  const nextOverride = {};
-
-  const nextWpUrl = editWpUrl.value.trim();
-  const nextUsername = editWpUsername.value.trim();
-
-  if (nextWpUrl && nextWpUrl !== defaults.wpUrl) {
-    nextOverride.wpUrl = nextWpUrl;
-  }
-
-  if (nextUsername && nextUsername !== defaults.username) {
-    nextOverride.username = nextUsername;
-  }
-
-  const passwordResult = nextPassword
-    ? await window.electronAPI.setWpPassword(key, nextPassword)
-    : await window.electronAPI.clearWpPassword(key);
-
-  if (!passwordResult?.ok) {
-    setStatus(passwordResult?.message || "Gagal menyimpan password WordPress.", "error");
-    showToast(`${iconMarkup("triangleExclamation")} Gagal menyimpan password WordPress.`, "error");
-    return;
-  }
-
-  if (Object.keys(nextOverride).length) {
-    wpOverrides[key] = nextOverride;
-  } else {
-    delete wpOverrides[key];
-  }
-
-  if (nextPassword) {
-    wpPasswords[key] = nextPassword;
-  } else {
-    delete wpPasswords[key];
-  }
-
-  await persistWpOverrides();
-  closeWpEditModal();
-  wpTestResult.textContent = "";
-  wpTestResult.className = "wp-test-result";
-  showToast(`${iconMarkup("circleCheck")} Preset ${WP_PRESETS_DEFAULT[key].name} disimpan.`, "success");
-}
-
-async function resetWpPresetData() {
-  const key = getWpPresetKey();
-  if (wpOverrides[key]) {
-    delete wpOverrides[key];
-  }
-  delete wpPasswords[key];
-  await persistWpOverrides();
-  await window.electronAPI.clearWpPassword(key);
-  closeWpEditModal();
-  wpTestResult.textContent = "";
-  wpTestResult.className = "wp-test-result";
-  showToast(`${iconMarkup("circleCheck")} Preset dikembalikan ke default.`, "success");
-}
-
-async function testWpConnection() {
-  await refreshWpPassword();
-  const cred = getWpCredentials();
-  if (!cred.wpUrl || !cred.username || !cred.appPassword) {
-    wpTestResult.textContent = "Isi semua field terlebih dahulu.";
-    wpTestResult.className = "wp-test-result error";
-    return;
-  }
-
-  wpTestResult.textContent = "Menghubungkan...";
-  wpTestResult.className = "wp-test-result";
-  wpTestConnection.disabled = true;
-
-  try {
-    const result = await window.electronAPI.testWpConnection(cred);
-    wpTestResult.textContent = result.message;
-    wpTestResult.className = `wp-test-result ${result.ok ? "success" : "error"}`;
-    if (result.ok) {
-      showToast(`${iconMarkup("circleCheck")} Koneksi WordPress berhasil!`, "success");
-    }
-  } catch (err) {
-    wpTestResult.textContent = err.message || "Gagal test koneksi.";
-    wpTestResult.className = "wp-test-result error";
-  } finally {
-    wpTestConnection.disabled = false;
-  }
-}
-
-function buildHtmlTag(sourceUrl, fileName, width, height) {
-  const alt = fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-  const dims = width && height ? ` width="${width}" height="${height}"` : "";
-  return `<img src="${escapeHtml(sourceUrl)}" alt="${escapeHtml(alt)}" loading="lazy"${dims}>`;
-}
-
-async function uploadFileToWp(filePath, fileName) {
-  const cred = getWpCredentials();
-  return window.electronAPI.uploadToWordPress({
-    ...cred,
-    filePath,
-    fileName
-  });
-}
-
 function renderFileList() {
   fileList.className = currentView === "grid" ? "file-list file-list--grid" : "file-list file-list--list";
   fileList.innerHTML = "";
@@ -630,8 +390,8 @@ function renderFileList() {
     fileList.innerHTML = `
       <div class="file-empty">
         <span class="file-empty-icon">${iconMarkup("cloudArrowUp")}</span>
-        <p class="file-empty-title">Belum ada gambar di queue</p>
-        <p class="file-empty-copy">Tambahkan file atau folder untuk mulai konversi. Semua fungsi lama tetap tersedia dari panel utama.</p>
+        <p class="file-empty-title">Antrean masih kosong.</p>
+        <p class="file-empty-copy">Tambahkan gambar dari panel kiri. File Anda akan muncul di sini, siap untuk dikonversi.</p>
       </div>
     `;
     return;
@@ -646,7 +406,7 @@ function renderFileList() {
     const safeName = escapeHtml(file.name);
     const safePath = escapeHtml(file.path);
     const thumbMarkup = canPreviewFile(file.path)
-      ? `<img class="${currentView === "grid" ? "f-grid-image" : "f-thumb-image"}" data-src="${toFileUrl(file.path)}" alt="">`
+      ? `<img class="${currentView === "grid" ? "f-grid-image" : "f-thumb-image"}" data-src="${escapeHtml(toFileUrl(file.path))}" alt="">`
       : `<span class="${currentView === "grid" ? "f-grid-fallback" : "f-thumb-fallback"}">${iconMarkup("fileImage")}</span>`;
     const convertedIcon = file.converted
       ? `<span class="f-converted-icon" data-tooltip="Sudah dikonversi">${iconMarkup("circleCheck")}</span>`
@@ -714,6 +474,9 @@ function renderFileList() {
       `;
     }
 
+    item.querySelectorAll('button[data-tooltip]').forEach(button => {
+      button.setAttribute("aria-label", button.dataset.tooltip);
+    });
     fragment.appendChild(item);
   }
 
@@ -787,8 +550,6 @@ function updateFileItemById(id) {
     }
   }
 
-  // Ensure any newly added/re-rendered thumbnail img is observer-tracked
-  initLazyLoading();
 }
 
 function renderPreview() {
@@ -816,66 +577,31 @@ function renderPreview() {
   previewImage.src = toFileUrl(file.path);
 }
 
-function renderLogs() {
-  if (conversionLogs.length === 0) {
-    settingsLogsEmpty.hidden = false;
-    settingsLogsWrap.hidden = true;
-    return;
-  }
+function createLogRow(log) {
+  const row = document.createElement("tr");
+  const time = document.createElement("td");
+  time.textContent = log.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const file = document.createElement("td");
+  file.className = "log-file";
+  file.title = log.file;
+  file.textContent = log.file;
+  const statusCell = document.createElement("td");
+  const status = document.createElement("span");
+  status.className = log.success ? "log-status success" : "log-status error";
+  status.title = log.success ? (log.sizeInfo || "") : (log.error || "Gagal");
+  status.textContent = log.success ? `Berhasil${log.sizeInfo ? " (" + log.sizeInfo + ")" : ""}` : "Gagal";
+  statusCell.append(status);
+  row.append(time, file, statusCell);
+  return row;
+}
 
+function addLogEntry(file, success, error, sizeInfo) {
+  const log = { time: new Date(), file, success, error, sizeInfo };
+  conversionLogs.unshift(log);
   settingsLogsEmpty.hidden = true;
   settingsLogsWrap.hidden = false;
-
-  settingsLogsBody.innerHTML = conversionLogs
-    .map((log, idx) => {
-      const timeStr = log.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const statusHtml = log.success
-        ? `<span class="log-status success" title="${log.sizeInfo || ''}">${iconMarkup("circleCheck")} Berhasil ${log.sizeInfo ? '(' + log.sizeInfo + ')' : ''}</span>`
-        : `<span class="log-status error" title="${log.error || 'Gagal'}">${iconMarkup("xmark")} Gagal</span>`;
-      const urlHtml = log.url
-        ? `<button class="log-copy-btn" data-log-idx="${idx}" title="Copy URL">${iconMarkup("clipboard")} Copy</button>`
-        : '';
-
-      return `
-        <tr>
-          <td>${timeStr}</td>
-          <td class="log-file" title="${escapeHtml(log.file)}">${escapeHtml(log.file)}</td>
-          <td>${statusHtml}</td>
-          <td>${urlHtml}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  settingsLogsBody.prepend(createLogRow(log));
 }
-
-function addLogEntry(file, success, error, sizeInfo, url) {
-  conversionLogs.unshift({
-    time: new Date(),
-    file,
-    success,
-    error,
-    sizeInfo,
-    url
-  });
-  renderLogs();
-}
-
-settingsLogsBody.addEventListener("click", (event) => {
-  const copyBtn = event.target.closest(".log-copy-btn");
-  if (!copyBtn) return;
-  const idx = Number(copyBtn.dataset.logIdx);
-  const log = conversionLogs[idx];
-  if (!log || !log.url) return;
-  navigator.clipboard.writeText(log.url).then(() => {
-    const original = copyBtn.innerHTML;
-    copyBtn.innerHTML = `${iconMarkup("circleCheck")} Copied!`;
-    copyBtn.classList.add("copied");
-    setTimeout(() => {
-      copyBtn.innerHTML = original;
-      copyBtn.classList.remove("copied");
-    }, 1500);
-  });
-});
 
 function removeFileById(id) {
   if (isConverting) return;
@@ -1007,6 +733,7 @@ async function chooseOutputFolder() {
   const folder = await window.electronAPI.pickOutputFolder();
   if (!folder) return;
   outputDir = folder;
+  resetConversionState();
   window.electronAPI.setStoreValue(STORAGE_KEYS.outputDir, outputDir);
   updateOutputUI();
   updateControls();
@@ -1014,6 +741,11 @@ async function chooseOutputFolder() {
 }
 
 async function openOutputFolder() {
+  if (!outputDir && lastOutputPath) {
+    await window.electronAPI.showItemInFolder(lastOutputPath);
+    setStatus("Lokasi hasil konversi terakhir dibuka.");
+    return;
+  }
   if (!outputDir) {
     setStatus("Folder output belum dipilih.", "error");
     return;
@@ -1046,6 +778,7 @@ async function validateStoredOutputDir() {
 }
 
 async function startConversion() {
+  if (isConverting) return;
   const filesToConvert = selectedFiles.filter((f) => !f.converted);
 
   if (!filesToConvert.length) {
@@ -1057,27 +790,12 @@ async function startConversion() {
     return;
   }
 
-  if (wpAutoUpload?.checked) {
-    await refreshWpPassword();
-  }
-
-  const shouldUpload = wpAutoUpload?.checked && isWpConfigured();
-
-  if (wpAutoUpload?.checked && !isWpConfigured()) {
-    setStatus("WP Upload aktif tapi kredensial belum lengkap. Buka Pengaturan.", "error");
-    showToast(`${iconMarkup("triangleExclamation")} Isi kredensial WordPress di Pengaturan!`, "error");
-    return;
-  }
-
   isConverting = true;
-  collectedHtmlSnippets.length = 0;
   updateControls();
   renderFileList();
   setProgress(0, filesToConvert.length);
   showProgress(true);
-  const initialMsg = shouldUpload
-    ? "Mulai konversi & upload ke WordPress..."
-    : outputDir ? "Mulai konversi ke folder output..." : "Mulai konversi ke folder asal gambar...";
+  const initialMsg = outputDir ? "Mulai konversi ke folder output..." : "Mulai konversi ke folder asal gambar...";
 
   setStatus(initialMsg, "processing");
   showToast(`${iconMarkup("rocket")} ${initialMsg}`, "success", 3000);
@@ -1097,20 +815,6 @@ async function startConversion() {
       setProgress(result.processed ?? result.total ?? filesToConvert.length, result.total || filesToConvert.length);
       setStatus(result.message, result.cancelled || result.failed ? "warning" : "success");
 
-      // Manual Copy HTML snippets
-      if (!result.cancelled && shouldUpload && collectedHtmlSnippets.length > 0) {
-        const fullHtml = collectedHtmlSnippets.join("\n");
-        const toastHtml = `${iconMarkup("circleCheck")} Upload selesai! ${collectedHtmlSnippets.length} HTML siap. <button id="copyHtmlToastBtn" style="margin-left: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer;">Copy HTML</button>`;
-        showToast(toastHtml, "success", 0);
-        const copyBtn = document.getElementById("copyHtmlToastBtn");
-        if (copyBtn) {
-          copyBtn.addEventListener("click", async () => {
-            await window.electronAPI.copyToClipboard(fullHtml);
-            showToast(`${iconMarkup("circleCheck")} HTML berhasil disalin ke clipboard!`, "success");
-            addLogEntry("HTML Clipboard", true, null, `${collectedHtmlSnippets.length} tag disalin`);
-          });
-        }
-      }
     }
   } catch (error) {
     setStatus(error?.message || "Terjadi kesalahan.", "error");
@@ -1123,6 +827,9 @@ async function startConversion() {
 
 async function initializeFromStorage() {
   hydrateStaticIcons();
+  document.querySelectorAll('button[data-tooltip]').forEach(button => {
+    if (!button.hasAttribute("aria-label")) button.setAttribute("aria-label", button.dataset.tooltip);
+  });
 
   const savedTheme = await window.electronAPI.getStoreValue(STORAGE_KEYS.theme);
   await applyTheme(savedTheme || "system");
@@ -1143,12 +850,13 @@ async function initializeFromStorage() {
   qualityLabel.textContent = `${quality.value}%`;
 
   const savedPreserve = await window.electronAPI.getStoreValue(STORAGE_KEYS.preserveFolders);
-  preserveFolders.checked = savedPreserve === null ? true : savedPreserve === true || savedPreserve === "true";
+  preserveFolders.checked = savedPreserve == null ? true : savedPreserve === true || savedPreserve === "true";
 
   const savedFormat = await window.electronAPI.getStoreValue(STORAGE_KEYS.outputFormat);
-  if (savedFormat) {
+  if (["webp", "avif", "jpeg", "png"].includes(savedFormat)) {
     outputFormat.value = savedFormat;
   }
+  syncFormatChoices();
 
   updateOutputUI();
   updateFileCount();
@@ -1158,16 +866,6 @@ async function initializeFromStorage() {
   renderFileList();
   await validateStoredOutputDir();
 
-  // Load WP settings
-  const savedWpToggle = await window.electronAPI.getStoreValue(STORAGE_KEYS.wpAutoUpload);
-  if (wpAutoUpload) wpAutoUpload.checked = savedWpToggle === true || savedWpToggle === "true";
-
-  const savedPreset = await window.electronAPI.getStoreValue(STORAGE_KEYS.wpPresetSelect);
-  if (wpPresetSelect && savedPreset) wpPresetSelect.value = savedPreset;
-
-  const savedOverridesStr = await window.electronAPI.getStoreValue(STORAGE_KEYS.wpPresetOverrides);
-  wpOverrides = sanitizeWpOverrides(savedOverridesStr);
-  await loadAllWpPasswords();
 }
 
 themeToggle.addEventListener("click", toggleTheme);
@@ -1175,6 +873,10 @@ aboutBtn.addEventListener("click", openAbout);
 aboutClose.addEventListener("click", closeAbout);
 aboutOverlay.addEventListener("click", closeAbout);
 settingsBtn.addEventListener("click", openSettings);
+$("logsBtn").addEventListener("click", () => {
+  openSettings();
+  switchSettingsTab("logs");
+});
 settingsClose.addEventListener("click", closeSettings);
 settingsOverlay.addEventListener("click", closeSettings);
 
@@ -1184,7 +886,27 @@ settingsPanel.querySelectorAll(".settings-nav-item").forEach(btn => {
 });
 
 settingsPickOutput.addEventListener("click", chooseOutputFolder);
+function resetConversionState() {
+  if (isConverting) return;
+  for (const file of selectedFiles) file.converted = false;
+  updateControls();
+  renderFileList();
+}
+
+function syncFormatChoices() {
+  formatChoices.forEach(choice => { choice.checked = choice.value === outputFormat.value; });
+}
+
+formatChoices.forEach(choice => {
+  choice.addEventListener("change", () => {
+    if (!choice.checked || choice.disabled || isConverting) return;
+    outputFormat.value = choice.value;
+    outputFormat.dispatchEvent(new Event("change"));
+  });
+});
+
 quality.addEventListener("input", () => {
+  resetConversionState();
   qualityLabel.textContent = `${quality.value}%`;
   window.electronAPI.setStoreValue(STORAGE_KEYS.quality, quality.value);
 });
@@ -1192,6 +914,8 @@ preserveFolders.addEventListener("change", () => {
   window.electronAPI.setStoreValue(STORAGE_KEYS.preserveFolders, preserveFolders.checked);
 });
 outputFormat.addEventListener("change", () => {
+  syncFormatChoices();
+  resetConversionState();
   window.electronAPI.setStoreValue(STORAGE_KEYS.outputFormat, outputFormat.value);
 });
 settingsClearAll.addEventListener("click", () => {
@@ -1215,6 +939,7 @@ quickOutputBtn?.addEventListener("click", async () => {
   const p = await window.electronAPI.pickOutputFolder();
   if (p) {
     outputDir = p;
+    resetConversionState();
     window.electronAPI.setStoreValue(STORAGE_KEYS.outputDir, p);
     updateOutputUI();
     updateControls();
@@ -1301,7 +1026,7 @@ aboutCreatorPhoto.addEventListener("error", () => {
   syncAboutCreatorPhoto();
 });
 
-window.electronAPI.onConvertProgress(async (data) => {
+window.electronAPI.onConvertProgress((data) => {
   setProgress(data.current, data.total);
   setStatus(data.status || "Memproses...", "processing");
 
@@ -1311,9 +1036,10 @@ window.electronAPI.onConvertProgress(async (data) => {
 
     // Process successful conversion
     if (data.convertedOk) {
+      if (data.outputPath) lastOutputPath = data.outputPath;
       if (file) {
         file.converted = true;
-        renderFileList();
+        updateFileItemById(file.id);
       }
 
       const savedBytes = (data.originalSize || 0) - (data.newSize || 0);
@@ -1321,25 +1047,6 @@ window.electronAPI.onConvertProgress(async (data) => {
       const sizeInfo = savedBytes >= 0 ? `hemat ${pct}%` : `tambah ${Math.abs(pct)}%`;
       addLogEntry(basename(data.srcPath), true, null, sizeInfo);
 
-      // WP Auto-Upload
-      if (wpAutoUpload?.checked && isWpConfigured() && data.outputPath) {
-        const outputFilePath = data.outputPath;
-        const outputFileName = data.outputFileName;
-
-        setStatus(`Uploading ${outputFileName} ke WordPress...`, "processing");
-        try {
-          const wpResult = await uploadFileToWp(outputFilePath, outputFileName);
-          if (wpResult.ok) {
-            const htmlTag = buildHtmlTag(wpResult.sourceUrl, outputFileName, wpResult.width, wpResult.height);
-            collectedHtmlSnippets.push(htmlTag);
-            addLogEntry(`WP: ${outputFileName}`, true, null, "uploaded", wpResult.sourceUrl);
-          } else {
-            addLogEntry(`WP: ${outputFileName}`, false, wpResult.message);
-          }
-        } catch (err) {
-          addLogEntry(`WP: ${outputFileName}`, false, err.message);
-        }
-      }
     }
     // Process failed conversion
     else if (data.status && data.status.startsWith("Gagal")) {
@@ -1407,6 +1114,22 @@ document.addEventListener("drop", async (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Tab") {
+    const modal = [aboutModal, settingsPanel, previewModal].find(dialog => dialog.classList.contains("open"));
+    if (modal) {
+      const controls = [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]')]
+        .filter(control => control.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (first && event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (first && !event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
   const accel = event.ctrlKey || event.metaKey;
   if (aboutModal.classList.contains("open") && event.key === "Escape") {
     event.preventDefault();
@@ -1558,40 +1281,3 @@ function initTooltipSystem() {
     window.electronAPI.signalReady();
   });
 })();
-
-// WordPress event listeners
-if (wpAutoUpload) {
-  wpAutoUpload.addEventListener("change", () => {
-    window.electronAPI.setStoreValue(STORAGE_KEYS.wpAutoUpload, wpAutoUpload.checked);
-  });
-}
-
-if (wpPresetSelect) {
-  wpPresetSelect.addEventListener("change", async () => {
-    await window.electronAPI.setStoreValue(STORAGE_KEYS.wpPresetSelect, wpPresetSelect.value);
-    await refreshWpPassword(wpPresetSelect.value);
-    wpTestResult.textContent = "";
-    wpTestResult.className = "wp-test-result";
-  });
-}
-
-if (wpEditPresetBtn) {
-  wpEditPresetBtn.addEventListener("click", openWpEditModal);
-}
-if (wpEditClose) wpEditClose.addEventListener("click", closeWpEditModal);
-if (wpEditOverlay) wpEditOverlay.addEventListener("click", closeWpEditModal);
-
-if (editWpSaveBtn) editWpSaveBtn.addEventListener("click", saveWpPresetData);
-if (editWpResetBtn) editWpResetBtn.addEventListener("click", resetWpPresetData);
-
-if (editWpTogglePassword) {
-  editWpTogglePassword.addEventListener("click", () => {
-    const isHidden = editWpAppPassword.type === "password";
-    editWpAppPassword.type = isHidden ? "text" : "password";
-    editWpEyeIcon.innerHTML = iconMarkup(isHidden ? "eyeSlash" : "eye");
-  });
-}
-
-if (wpTestConnection) {
-  wpTestConnection.addEventListener("click", testWpConnection);
-}
