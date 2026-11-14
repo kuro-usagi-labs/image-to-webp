@@ -21,11 +21,11 @@ npm run test:ui
 npm audit
 ```
 
-`test:electron` dan `test:ui` menggunakan profil sementara. Hasil capture UI berada di `artifacts/ui/` dan tidak dimasukkan ke Git. Untuk memperbarui screenshot README menggunakan file contoh dan path yang sudah disamarkan:
+`test:electron` dan `test:ui` menggunakan profil sementara. Hasil capture UI berada di `artifacts/ui/` dan tidak dimasukkan ke Git. Untuk memperbarui screenshot README dari keadaan awal aplikasi tanpa path atau file pribadi:
 
 ```powershell
-node scripts/run-electron-smoke.cjs --ui --readme
-Copy-Item artifacts/ui/queue-1220.png docs/images/workspace.png
+npm run test:ui
+Copy-Item artifacts/ui/empty-1220.png docs/images/workspace.png
 ```
 
 ## Mengirim perubahan

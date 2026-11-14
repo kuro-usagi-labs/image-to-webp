@@ -11,7 +11,7 @@ Image to WebP, dengan antarmuka **ImgConv**, membantu menyiapkan foto produk, ga
 
 ![Workspace Image to WebP](docs/images/workspace.png)
 
-*Antrean gambar menjadi area utama; pengaturan berada di sidebar dan tombol konversi tetap terlihat saat daftar digulir. Screenshot menggunakan file contoh.*
+*Antrean gambar menjadi area utama; pengaturan berada di sidebar dan tombol konversi tetap terlihat saat daftar digulir. Screenshot menampilkan keadaan awal aplikasi.*
 
 ## Unduh untuk Windows
 

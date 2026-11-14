@@ -8,7 +8,6 @@ async function run() {
   const env = { ...process.env, IMGCONV_TEST_ROOT: testRoot };
   delete env.ELECTRON_RUN_AS_NODE;
   const args = process.argv.slice(2);
-  if (args.includes("--readme")) env.IMGCONV_README_PREVIEW = "1";
   const entry = args.includes("--ui") ? "capture-ui.cjs" : "electron-smoke.cjs";
   const child = spawn(require("electron"), [path.join(__dirname, entry), "--hidden", ...args.filter(arg => arg !== "--ui")], {
     cwd: path.join(__dirname, ".."), env, stdio: "inherit", windowsHide: true

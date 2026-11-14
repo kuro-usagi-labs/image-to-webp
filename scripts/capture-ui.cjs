@@ -52,16 +52,6 @@ async function run() {
       win.setContentSize(width, height);
       await js(`document.getElementById('toast').classList.remove('show')`);
       await settle();
-      if (process.env.IMGCONV_README_PREVIEW === "1") {
-        await js(`document.querySelectorAll('.file-item').forEach(item => {
-        const name = item.querySelector('.f-name')?.textContent || '';
-        const path = item.querySelector('.f-path');
-        if (path) path.textContent = 'C:/Gambar/Website/' + name;
-        item.title = name;
-        })`);
-        await settle();
-        assert.ok(await js(`Array.from(document.querySelectorAll('.f-path')).every(node => node.textContent.startsWith('C:/Gambar/Website/'))`), "Screenshot paths were not sanitized");
-      }
       const metrics = await js(`(() => {
         const button = document.getElementById('convertBtn').getBoundingClientRect();
         const queue = document.querySelector('.queue-panel').getBoundingClientRect();
